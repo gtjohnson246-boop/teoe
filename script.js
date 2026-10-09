@@ -18,7 +18,6 @@ let cameraPitch = 0;
 let lookPointerId = null;
 let lastLookX = 0;
 let lastLookY = 0;
-let lampElapsed = 0;
 
 function finishIntro() {
   if (introFinished) return;
@@ -90,11 +89,11 @@ async function createGrassScene() {
   renderer.toneMappingExposure = 1.2;
 
   const scene = new Scene();
-  scene.background = new Color(0x101a2b);
-  scene.fog = new Fog(0x182338, 40, 118);
-  scene.add(new HemisphereLight(0x64799f, 0x25251b, 0.78));
+  scene.background = new Color(0x17243a);
+  scene.fog = new Fog(0x202d43, 42, 120);
+  scene.add(new HemisphereLight(0x8298c2, 0x302d23, 1.05));
 
-  const moonlight = new DirectionalLight(0xa4b7e2, 0.42);
+  const moonlight = new DirectionalLight(0xb5c7ea, 0.62);
   moonlight.position.set(-30, 45, 20);
   scene.add(moonlight);
 
@@ -166,7 +165,7 @@ async function createGrassScene() {
     const makeGlowingMaterial = (material) => {
       const glowingMaterial = material.clone();
       glowingMaterial.emissive.set(0xffb84a);
-      glowingMaterial.emissiveIntensity = 0.15;
+      glowingMaterial.emissiveIntensity = 0.7;
       lampMaterials.push(glowingMaterial);
       return glowingMaterial;
     };
@@ -180,27 +179,28 @@ async function createGrassScene() {
   lampModel.position.set(-lampCenter.x, -lampBounds.min.y, -lampCenter.z);
   const lampRoot = new Group();
   lampRoot.add(lampModel);
-  lampRoot.scale.setScalar(0.075);
-  lampRoot.position.set(0, 0.76, -6);
+  lampRoot.scale.setScalar(0.09);
+  lampRoot.position.set(0, 0.76, -4.2);
   scene.add(lampRoot);
   lampRoot.updateMatrixWorld(true);
+  const lampFocus = new Box3().setFromObject(lampRoot).getCenter(new Vector3());
 
   const table = new Group();
-  const woodMaterial = new MeshStandardMaterial({ color: 0x59402c, roughness: 0.82 });
-  const tableTop = new Mesh(new BoxGeometry(1.5, 0.12, 1.15), woodMaterial);
-  tableTop.position.set(0, 0.7, -6);
+  const woodMaterial = new MeshStandardMaterial({ color: 0x72543a, roughness: 0.82 });
+  const tableTop = new Mesh(new BoxGeometry(1.65, 0.12, 1.3), woodMaterial);
+  tableTop.position.set(0, 0.7, -4.2);
   table.add(tableTop);
   for (const x of [-0.62, 0.62]) {
     for (const z of [-0.46, 0.46]) {
       const leg = new Mesh(new BoxGeometry(0.1, 0.7, 0.1), woodMaterial);
-      leg.position.set(x, 0.35, -6 + z);
+      leg.position.set(x, 0.35, -4.2 + z);
       table.add(leg);
     }
   }
   scene.add(table);
 
   const bulbBounds = new Box3().setFromObject(lampBulb);
-  const lampLight = new PointLight(0xffc66c, 0.2, 24, 2);
+  const lampLight = new PointLight(0xffc66c, 2.4, 18, 2);
   lampLight.position.copy(bulbBounds.getCenter(new Vector3()));
   lampLight.position.y += 0.08;
   scene.add(lampLight);
@@ -220,7 +220,7 @@ async function createGrassScene() {
     for (let column = 0; column < fieldRows; column += 1) {
       const x = (column - (fieldRows - 1) / 2) * spacing;
       const z = (row - (fieldRows - 1) / 2) * spacing;
-      if (Math.hypot(x, z + 6) < 1.2) continue;
+      if (Math.hypot(x, z + 4.2) < 1.5) continue;
 
       const variantIndex = Math.floor(random() * variants.length);
       positionsByVariant[variantIndex].push({
@@ -323,7 +323,7 @@ async function createGrassScene() {
   for (let index = 0; index < bladeCount; index += 1) {
     const x = (random() - 0.5) * fieldRows * spacing;
     const z = (random() - 0.5) * fieldRows * spacing;
-    if (Math.hypot(x, z + 6) < 1.2) continue;
+    if (Math.hypot(x, z + 4.2) < 1.5) continue;
 
     const chunkX = Math.min(
       bladeChunkRows - 1,
@@ -378,9 +378,14 @@ async function createGrassScene() {
   const camera = new PerspectiveCamera(72, 1, 0.1, 140);
   camera.position.set(0, 1.7, 0);
   camera.rotation.order = 'YXZ';
-  camera.rotation.set(-0.055, 0, 0, 'YXZ');
+  const spawnYaw = Math.atan2(-lampFocus.x, -lampFocus.z);
+  const spawnPitch = Math.atan2(
+    camera.position.y - lampFocus.y,
+    Math.hypot(lampFocus.x - camera.position.x, lampFocus.z - camera.position.z)
+  );
+  camera.rotation.set(spawnPitch, spawnYaw, 0, 'YXZ');
 
-  return { renderer, scene, camera, windUniforms, lampLight, lampMaterials };
+  return { renderer, scene, camera, windUniforms, lampLight, spawnYaw, spawnPitch };
 }
 
 function resizeGrassScene() {
@@ -401,7 +406,6 @@ function renderGrass(time) {
 
   const delta = lastGrassFrame === 0 ? 0 : Math.min((time - lastGrassFrame) / 1000, 0.05);
   lastGrassFrame = time;
-  lampElapsed += delta;
   const forward = Number(movementKeys.has('KeyW') || movementKeys.has('ArrowUp'))
     - Number(movementKeys.has('KeyS') || movementKeys.has('ArrowDown'));
   const strafe = Number(movementKeys.has('KeyD') || movementKeys.has('ArrowRight'))
@@ -422,11 +426,6 @@ function renderGrass(time) {
   );
   grassScene.camera.rotation.set(cameraPitch, cameraYaw, 0, 'YXZ');
   grassScene.windUniforms.time.value = time * 0.001;
-  grassScene.lampLight.intensity = Math.min(0.2 + lampElapsed * 0.12, 5);
-  const bulbGlow = Math.min(0.04 + lampElapsed * 0.012, 0.65);
-  grassScene.lampMaterials.forEach((material) => {
-    material.emissiveIntensity = bulbGlow;
-  });
   grassScene.renderer.render(grassScene.scene, grassScene.camera);
   grassAnimationFrame = requestAnimationFrame(renderGrass);
 }
@@ -443,13 +442,12 @@ playButton.addEventListener('click', async () => {
   menu.hidden = true;
   grassGame.hidden = false;
   movementKeys.clear();
-  cameraYaw = 0;
-  cameraPitch = -0.055;
-  lampElapsed = 0;
   grassStatus.textContent = '';
   grassStatus.removeAttribute('data-error');
 
   if (grassScene) {
+    cameraYaw = grassScene.spawnYaw;
+    cameraPitch = grassScene.spawnPitch;
     startGrassScene();
     return;
   }
@@ -460,6 +458,8 @@ playButton.addEventListener('click', async () => {
 
   try {
     grassScene = await createGrassScene();
+    cameraYaw = grassScene.spawnYaw;
+    cameraPitch = grassScene.spawnPitch;
     grassStatus.textContent = '';
     startGrassScene();
   } catch (error) {
