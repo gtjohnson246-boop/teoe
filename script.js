@@ -33,12 +33,14 @@ async function createGrassScene() {
   const [
     {
       ACESFilmicToneMapping,
-      AmbientLight,
+      CanvasTexture,
       Color,
       DirectionalLight,
       DoubleSide,
       Euler,
+      Float32BufferAttribute,
       Fog,
+      HemisphereLight,
       InstancedMesh,
       Matrix4,
       Mesh,
@@ -46,6 +48,7 @@ async function createGrassScene() {
       PerspectiveCamera,
       PlaneGeometry,
       Quaternion,
+      RepeatWrapping,
       Scene,
       SRGBColorSpace,
       Vector3,
@@ -57,6 +60,7 @@ async function createGrassScene() {
     import('three/addons/loaders/GLTFLoader.js')
   ]);
 
+  const random = () => Math.random();
   const loader = new GLTFLoader();
   const gltf = await new Promise((resolve, reject) => {
     loader.load('grass/tdcrdbur_tier_3.gltf', resolve, undefined, reject);
@@ -76,15 +80,47 @@ async function createGrassScene() {
   const scene = new Scene();
   scene.background = new Color(0xa5bd83);
   scene.fog = new Fog(0xa5bd83, 38, 115);
-  scene.add(new AmbientLight(0xffffff, 2.4));
+  scene.add(new HemisphereLight(0xdde9c1, 0x51503a, 2.1));
 
-  const sunlight = new DirectionalLight(0xfff2d6, 3.5);
+  const sunlight = new DirectionalLight(0xfff2d6, 2.5);
   sunlight.position.set(-30, 45, 20);
   scene.add(sunlight);
 
+  const groundCanvas = document.createElement('canvas');
+  groundCanvas.width = 256;
+  groundCanvas.height = 256;
+  const groundContext = groundCanvas.getContext('2d');
+  if (!groundContext) {
+    throw new Error('Could not create the grass field ground texture.');
+  }
+  groundContext.fillStyle = '#59683c';
+  groundContext.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 4200; i += 1) {
+    const shade = Math.floor(random() * 38);
+    const green = 62 + shade;
+    groundContext.fillStyle = `rgba(${36 + Math.floor(shade * 0.45)}, ${green}, ${29 + Math.floor(shade * 0.28)}, ${0.08 + random() * 0.2})`;
+    const radius = 0.4 + random() * 3;
+    groundContext.beginPath();
+    groundContext.ellipse(
+      random() * 256,
+      random() * 256,
+      radius * (0.8 + random() * 1.2),
+      radius,
+      random() * Math.PI,
+      0,
+      Math.PI * 2
+    );
+    groundContext.fill();
+  }
+  const groundTexture = new CanvasTexture(groundCanvas);
+  groundTexture.colorSpace = SRGBColorSpace;
+  groundTexture.wrapS = RepeatWrapping;
+  groundTexture.wrapT = RepeatWrapping;
+  groundTexture.repeat.set(12, 12);
+
   const ground = new Mesh(
     new PlaneGeometry(120, 120),
-    new MeshStandardMaterial({ color: 0x566c31, roughness: 1 })
+    new MeshStandardMaterial({ map: groundTexture, roughness: 1 })
   );
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.06;
@@ -97,9 +133,8 @@ async function createGrassScene() {
     });
     return sources;
   });
-  const fieldRows = 80;
-  const spacing = 1.3;
-  const random = () => Math.random();
+  const fieldRows = 68;
+  const spacing = 1.5;
   const positionsByVariant = variants.map(() => []);
 
   for (let row = 0; row < fieldRows; row += 1) {
@@ -119,13 +154,24 @@ async function createGrassScene() {
   const orientation = new Quaternion();
   const up = new Vector3(0, 1, 0);
   const plantScale = new Vector3();
+  const plantPosition = new Vector3();
 
   variants.forEach((variant, variantIndex) => {
     const positions = positionsByVariant[variantIndex];
     if (positions.length === 0) return;
 
     for (const source of variantSources[variantIndex]) {
-      const plants = new InstancedMesh(source.geometry, source.material, positions.length);
+      const makeCutoutMaterial = (material) => {
+        const cutoutMaterial = material.clone();
+        cutoutMaterial.transparent = false;
+        cutoutMaterial.alphaTest = 0.4;
+        cutoutMaterial.depthWrite = true;
+        return cutoutMaterial;
+      };
+      const cutoutMaterial = Array.isArray(source.material)
+        ? source.material.map(makeCutoutMaterial)
+        : makeCutoutMaterial(source.material);
+      const plants = new InstancedMesh(source.geometry, cutoutMaterial, positions.length);
       plants.name = `${variant.name} field`;
       plants.castShadow = false;
       plants.receiveShadow = true;
@@ -134,7 +180,8 @@ async function createGrassScene() {
       positions.forEach((position, index) => {
         orientation.setFromAxisAngle(up, position.yaw);
         plantScale.setScalar(position.scale);
-        placement.compose(new Vector3(position.x, 0, position.z), orientation, plantScale);
+        plantPosition.set(position.x, 0, position.z);
+        placement.compose(plantPosition, orientation, plantScale);
         placement.multiply(sourceTransform);
         plants.setMatrixAt(index, placement);
       });
@@ -144,29 +191,64 @@ async function createGrassScene() {
     }
   });
 
-  const bladeGeometry = new PlaneGeometry(0.075, 0.42, 1, 2);
+  const bladeGeometry = new PlaneGeometry(0.075, 0.46, 2, 4);
   bladeGeometry.translate(0, 0.21, 0);
+  const bladePositions = bladeGeometry.attributes.position;
+  const bladeVertexColors = [];
+  const bladeBaseColor = new Color(0x465b23);
+  const bladeTipColor = new Color(0xa2ae52);
+  for (let index = 0; index < bladePositions.count; index += 1) {
+    const height = bladePositions.getY(index) + 0.02;
+    const heightRatio = Math.min(height / 0.46, 1);
+    const bend = height * height * 0.16;
+    bladePositions.setX(index, bladePositions.getX(index) * (1 - heightRatio) + bend);
+    const shade = bladeBaseColor.clone().lerp(bladeTipColor, heightRatio);
+    bladeVertexColors.push(shade.r, shade.g, shade.b);
+  }
+  bladePositions.needsUpdate = true;
+  bladeGeometry.setAttribute('color', new Float32BufferAttribute(bladeVertexColors, 3));
+  bladeGeometry.computeVertexNormals();
+  const windUniforms = { time: { value: 0 } };
   const bladeMaterial = new MeshStandardMaterial({
     color: 0xffffff,
     roughness: 0.9,
     side: DoubleSide,
-    vertexColors: false
+    vertexColors: true
   });
-  const bladeCount = 30000;
-  const blades = new InstancedMesh(bladeGeometry, bladeMaterial, bladeCount);
-  blades.name = 'Fine grass blades';
-  blades.frustumCulled = false;
+  bladeMaterial.onBeforeCompile = (shader) => {
+    shader.uniforms.uGrassTime = windUniforms.time;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform float uGrassTime;')
+      .replace(
+        '#include <begin_vertex>',
+        '#include <begin_vertex>\ntransformed.x += sin(uGrassTime * 1.4 + instanceMatrix[3][0] * 0.4 + instanceMatrix[3][2] * 0.4) * position.y * 0.045;'
+      );
+  };
+  bladeMaterial.customProgramCacheKey = () => 'grass-wind-v1';
   const bladeMatrix = new Matrix4();
   const bladeRotation = new Quaternion();
   const bladeEuler = new Euler();
   const bladePosition = new Vector3();
   const bladeScale = new Vector3();
-  const bladeColor = new Color();
   const greenPalette = [0x718c35, 0x819b3e, 0x96a949, 0x5e792d, 0xa0ad52];
+  const bladeColors = greenPalette.map((color) => new Color(color));
+  const bladeChunkRows = 8;
+  const bladeChunkCount = bladeChunkRows * bladeChunkRows;
+  const bladeCount = 20000;
+  const bladesPerChunk = Array.from({ length: bladeChunkCount }, () => []);
 
   for (let index = 0; index < bladeCount; index += 1) {
     const x = (random() - 0.5) * fieldRows * spacing;
     const z = (random() - 0.5) * fieldRows * spacing;
+    const chunkX = Math.min(
+      bladeChunkRows - 1,
+      Math.floor(((x + (fieldRows * spacing) / 2) / (fieldRows * spacing)) * bladeChunkRows)
+    );
+    const chunkZ = Math.min(
+      bladeChunkRows - 1,
+      Math.floor(((z + (fieldRows * spacing) / 2) / (fieldRows * spacing)) * bladeChunkRows)
+    );
+    const chunkIndex = chunkZ * bladeChunkRows + chunkX;
     bladePosition.set(x, 0, z);
     bladeEuler.set(
       (random() - 0.5) * 0.28,
@@ -177,19 +259,42 @@ async function createGrassScene() {
     bladeRotation.setFromEuler(bladeEuler);
     bladeScale.set(0.75 + random() * 0.65, 0.65 + random() * 0.8, 1);
     bladeMatrix.compose(bladePosition, bladeRotation, bladeScale);
-    blades.setMatrixAt(index, bladeMatrix);
-    bladeColor.setHex(greenPalette[Math.floor(random() * greenPalette.length)]);
-    blades.setColorAt(index, bladeColor);
+    bladesPerChunk[chunkIndex].push([
+      x,
+      z,
+      bladeEuler.x,
+      bladeEuler.y,
+      bladeEuler.z,
+      bladeScale.x,
+      bladeScale.y,
+      Math.floor(random() * greenPalette.length)
+    ]);
   }
-  blades.instanceMatrix.needsUpdate = true;
-  if (blades.instanceColor) blades.instanceColor.needsUpdate = true;
-  scene.add(blades);
+
+  bladesPerChunk.forEach((instances, chunkIndex) => {
+    if (instances.length === 0) return;
+
+    const blades = new InstancedMesh(bladeGeometry, bladeMaterial, instances.length);
+    blades.name = `Fine grass blades ${chunkIndex}`;
+    instances.forEach((instance, index) => {
+      bladePosition.set(instance[0], 0, instance[1]);
+      bladeEuler.set(instance[2], instance[3], instance[4], 'YXZ');
+      bladeRotation.setFromEuler(bladeEuler);
+      bladeScale.set(instance[5], instance[6], 1);
+      bladeMatrix.compose(bladePosition, bladeRotation, bladeScale);
+      blades.setMatrixAt(index, bladeMatrix);
+      blades.setColorAt(index, bladeColors[instance[7]]);
+    });
+    blades.instanceMatrix.needsUpdate = true;
+    if (blades.instanceColor) blades.instanceColor.needsUpdate = true;
+    scene.add(blades);
+  });
 
   const camera = new PerspectiveCamera(72, 1, 0.1, 140);
   camera.position.set(0, 1.45, 0);
   camera.rotation.order = 'YXZ';
 
-  return { renderer, scene, camera };
+  return { renderer, scene, camera, windUniforms };
 }
 
 function resizeGrassScene() {
@@ -229,6 +334,7 @@ function renderGrass(time) {
     Math.min(fieldHalfSize, grassScene.camera.position.z + (forward * forwardZ + strafe * rightZ) * speed)
   );
   grassScene.camera.rotation.set(cameraPitch, cameraYaw, 0, 'YXZ');
+  grassScene.windUniforms.time.value = time * 0.001;
   grassScene.renderer.render(grassScene.scene, grassScene.camera);
   grassAnimationFrame = requestAnimationFrame(renderGrass);
 }

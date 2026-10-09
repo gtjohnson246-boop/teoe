@@ -15,7 +15,7 @@ Browser version:
   `python3 -m http.server 8000`
 - Then visit: `http://localhost:8000`
 - The grass scene uses Three.js from a CDN, so an internet connection is needed when opening it for the first time.
-- In the grass field, use WASD or the arrow keys to move, and drag to turn the camera.
+- In the grass field, use WASD or the arrow keys to move, and drag to turn the camera. Grass is rendered in view-cullable patches with lightweight cutout foliage and gentle wind.
 
 GitHub Pages:
 - The site deploys from the `main` branch via the workflow in `.github/workflows/pages.yml`.
