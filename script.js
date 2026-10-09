@@ -179,7 +179,7 @@ async function createGrassScene() {
   lampModel.position.set(-lampCenter.x, -lampBounds.min.y, -lampCenter.z);
   const lampRoot = new Group();
   lampRoot.add(lampModel);
-  lampRoot.scale.setScalar(0.09);
+  lampRoot.scale.setScalar(2.1);
   lampRoot.position.set(0, 0.76, -4.2);
   scene.add(lampRoot);
   lampRoot.updateMatrixWorld(true);
@@ -380,7 +380,7 @@ async function createGrassScene() {
   camera.rotation.order = 'YXZ';
   const spawnYaw = Math.atan2(-lampFocus.x, -lampFocus.z);
   const spawnPitch = Math.atan2(
-    camera.position.y - lampFocus.y,
+    lampFocus.y - camera.position.y,
     Math.hypot(lampFocus.x - camera.position.x, lampFocus.z - camera.position.z)
   );
   camera.rotation.set(spawnPitch, spawnYaw, 0, 'YXZ');
