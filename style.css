@@ -19,11 +19,38 @@ body {
   min-height: 100dvh;
 }
 
+.screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.intro,
 .menu {
   display: grid;
   min-height: 100vh;
   min-height: 100dvh;
   place-items: center;
+}
+
+.intro {
+  overflow: hidden;
+}
+
+#title {
+  margin: 0;
+  color: #f5f5f5;
+  font-family: "Creepster", cursive;
+  font-size: clamp(2rem, 7vw, 3rem);
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.25), 0 0 30px rgba(255, 255, 255, 0.3);
+  opacity: 0;
+  transform: translateY(4px) scale(0.98);
+  user-select: none;
 }
 
 .menu-art {
