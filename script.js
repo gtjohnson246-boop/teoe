@@ -4,6 +4,7 @@ const playButton = document.getElementById('play-button');
 const grassGame = document.getElementById('grass-game');
 const grassCanvas = document.getElementById('grass-canvas');
 const grassStatus = document.getElementById('grass-status');
+const grassControls = document.getElementById('grass-controls');
 const backButton = document.getElementById('back-button');
 
 let introFinished = false;
@@ -11,6 +12,10 @@ let grassScene = null;
 let grassLoading = false;
 let grassAnimationFrame = 0;
 let lastGrassFrame = 0;
+let lampGazeSeconds = 0;
+let enteringLivingRoom = false;
+let livingRoomLoadFailed = false;
+let lastGazeCountdown = 0;
 const movementKeys = new Set();
 const fieldHalfSize = 52;
 let cameraYaw = 0;
@@ -55,9 +60,11 @@ async function createGrassScene() {
       Points,
       PointsMaterial,
       Quaternion,
+      Raycaster,
       RepeatWrapping,
       Scene,
       SRGBColorSpace,
+      Vector2,
       Vector3,
       WebGLRenderer
     },
@@ -204,6 +211,56 @@ async function createGrassScene() {
   lampLight.position.copy(bulbBounds.getCenter(new Vector3()));
   lampLight.position.y += 0.08;
   scene.add(lampLight);
+  const gazeRaycaster = new Raycaster();
+  const screenCenter = new Vector2(0, 0);
+
+  const loadLivingRoom = async () => {
+    const [roomGltf, couchGltf] = await Promise.all([
+      loadModel('living-room/scene.gltf'),
+      loadModel('couch/scene.gltf')
+    ]);
+    const roomScene = new Scene();
+    roomScene.background = new Color(0x10131a);
+    roomScene.add(new HemisphereLight(0xffe6cf, 0x38313a, 1.8));
+
+    const roomLight = new DirectionalLight(0xffd7b0, 2.2);
+    roomLight.position.set(-3, 7, 4);
+    roomScene.add(roomLight);
+
+    const room = roomGltf.scene;
+    room.updateMatrixWorld(true);
+    const sourceRoomBounds = new Box3().setFromObject(room);
+    const roomScale = 0.25;
+    room.scale.setScalar(roomScale);
+    room.position.set(
+      -(sourceRoomBounds.min.x + sourceRoomBounds.max.x) * roomScale / 2,
+      -sourceRoomBounds.min.y * roomScale,
+      -(sourceRoomBounds.min.z + sourceRoomBounds.max.z) * roomScale / 2
+    );
+    roomScene.add(room);
+    room.updateMatrixWorld(true);
+    const roomBounds = new Box3().setFromObject(room);
+
+    const couch = couchGltf.scene;
+    couch.updateMatrixWorld(true);
+    const sourceCouchBounds = new Box3().setFromObject(couch);
+    const couchScale = roomScale * 0.55;
+    couch.scale.setScalar(couchScale);
+    couch.position.set(
+      -(sourceCouchBounds.min.x + sourceCouchBounds.max.x) * couchScale / 2,
+      -sourceCouchBounds.min.y * couchScale,
+      -1.1 - (sourceCouchBounds.min.z + sourceCouchBounds.max.z) * couchScale / 2
+    );
+    roomScene.add(couch);
+
+    return {
+      scene: roomScene,
+      minX: roomBounds.min.x + 0.25,
+      maxX: roomBounds.max.x - 0.25,
+      minZ: roomBounds.min.z + 0.25,
+      maxZ: roomBounds.max.z - 0.25
+    };
+  };
 
   const variantSources = variants.map((variant) => {
     const sources = [];
@@ -385,7 +442,20 @@ async function createGrassScene() {
   );
   camera.rotation.set(spawnPitch, spawnYaw, 0, 'YXZ');
 
-  return { renderer, scene, camera, windUniforms, lampLight, spawnYaw, spawnPitch };
+  return {
+    renderer,
+    scene,
+    camera,
+    windUniforms,
+    lampLight,
+    lampRoot,
+    gazeRaycaster,
+    screenCenter,
+    loadLivingRoom,
+    livingRoom: null,
+    spawnYaw,
+    spawnPitch
+  };
 }
 
 function resizeGrassScene() {
@@ -411,22 +481,77 @@ function renderGrass(time) {
   const strafe = Number(movementKeys.has('KeyD') || movementKeys.has('ArrowRight'))
     - Number(movementKeys.has('KeyA') || movementKeys.has('ArrowLeft'));
   const length = Math.hypot(forward, strafe) || 1;
-  const speed = 7 * delta / length;
+  const speed = (grassScene.livingRoom ? 2.5 : 7) * delta / length;
   const forwardX = -Math.sin(cameraYaw);
   const forwardZ = -Math.cos(cameraYaw);
   const rightX = Math.cos(cameraYaw);
   const rightZ = -Math.sin(cameraYaw);
+  const minX = grassScene.livingRoom?.minX ?? -fieldHalfSize;
+  const maxX = grassScene.livingRoom?.maxX ?? fieldHalfSize;
+  const minZ = grassScene.livingRoom?.minZ ?? -fieldHalfSize;
+  const maxZ = grassScene.livingRoom?.maxZ ?? fieldHalfSize;
   grassScene.camera.position.x = Math.max(
-    -fieldHalfSize,
-    Math.min(fieldHalfSize, grassScene.camera.position.x + (forward * forwardX + strafe * rightX) * speed)
+    minX,
+    Math.min(maxX, grassScene.camera.position.x + (forward * forwardX + strafe * rightX) * speed)
   );
   grassScene.camera.position.z = Math.max(
-    -fieldHalfSize,
-    Math.min(fieldHalfSize, grassScene.camera.position.z + (forward * forwardZ + strafe * rightZ) * speed)
+    minZ,
+    Math.min(maxZ, grassScene.camera.position.z + (forward * forwardZ + strafe * rightZ) * speed)
   );
   grassScene.camera.rotation.set(cameraPitch, cameraYaw, 0, 'YXZ');
   grassScene.windUniforms.time.value = time * 0.001;
-  grassScene.renderer.render(grassScene.scene, grassScene.camera);
+  if (!grassScene.livingRoom && !enteringLivingRoom) {
+    grassScene.camera.updateMatrixWorld();
+    grassScene.gazeRaycaster.setFromCamera(grassScene.screenCenter, grassScene.camera);
+    const isLookingAtLamp = grassScene.gazeRaycaster
+      .intersectObject(grassScene.lampRoot, true)
+      .length > 0;
+
+    if (isLookingAtLamp) {
+      if (!livingRoomLoadFailed) {
+        lampGazeSeconds += delta;
+        const countdown = Math.ceil(3 - lampGazeSeconds);
+        if (countdown !== lastGazeCountdown) {
+          lastGazeCountdown = countdown;
+          grassStatus.textContent = `Keep the lamp in view for ${countdown} second${countdown === 1 ? '' : 's'}...`;
+        }
+
+        if (lampGazeSeconds >= 3) {
+          enteringLivingRoom = true;
+          grassStatus.textContent = 'Entering the living room...';
+          movementKeys.clear();
+          void grassScene.loadLivingRoom()
+            .then((livingRoom) => {
+              grassScene.livingRoom = livingRoom;
+              grassScene.camera.position.set(0, 1.45, 1.5);
+              cameraYaw = 0;
+              cameraPitch = Math.atan2(0.9 - 1.45, 2.4);
+              grassControls.textContent = 'WASD / arrows to move · drag to look around the living room';
+              grassStatus.textContent = '';
+            })
+            .catch((error) => {
+              const message = error instanceof Error ? error.message : String(error);
+              console.error('Could not load the living room and couch:', error);
+              grassStatus.textContent = `Could not load the living room and couch: ${message}`;
+              grassStatus.dataset.error = 'true';
+              livingRoomLoadFailed = true;
+              lampGazeSeconds = 0;
+              lastGazeCountdown = 0;
+            })
+            .finally(() => {
+              enteringLivingRoom = false;
+            });
+        }
+      }
+    } else {
+      lampGazeSeconds = 0;
+      livingRoomLoadFailed = false;
+      lastGazeCountdown = 0;
+      grassStatus.textContent = '';
+      grassStatus.removeAttribute('data-error');
+    }
+  }
+  grassScene.renderer.render(grassScene.livingRoom?.scene ?? grassScene.scene, grassScene.camera);
   grassAnimationFrame = requestAnimationFrame(renderGrass);
 }
 
@@ -446,8 +571,19 @@ playButton.addEventListener('click', async () => {
   grassStatus.removeAttribute('data-error');
 
   if (grassScene) {
-    cameraYaw = grassScene.spawnYaw;
-    cameraPitch = grassScene.spawnPitch;
+    if (grassScene.livingRoom) {
+      grassScene.camera.position.set(0, 1.45, 1.5);
+      cameraYaw = 0;
+      cameraPitch = Math.atan2(0.9 - 1.45, 2.4);
+      grassControls.textContent = 'WASD / arrows to move · drag to look around the living room';
+    } else {
+      cameraYaw = grassScene.spawnYaw;
+      cameraPitch = grassScene.spawnPitch;
+      grassControls.textContent = 'WASD / arrows to move · drag to look · keep the lamp in view for 3 seconds';
+    }
+    lampGazeSeconds = 0;
+    livingRoomLoadFailed = false;
+    lastGazeCountdown = 0;
     startGrassScene();
     return;
   }
@@ -476,6 +612,9 @@ backButton.addEventListener('click', () => {
   grassGame.hidden = true;
   menu.hidden = false;
   movementKeys.clear();
+  lampGazeSeconds = 0;
+  livingRoomLoadFailed = false;
+  lastGazeCountdown = 0;
   lookPointerId = null;
   grassCanvas.classList.remove('is-looking');
   cancelAnimationFrame(grassAnimationFrame);

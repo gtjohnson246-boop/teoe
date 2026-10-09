@@ -16,8 +16,8 @@
         }
       }
     </script>
-    <link rel="stylesheet" href="style.css?v=lamp-visible-2" />
-    <script src="script.js?v=lamp-visible-2" defer></script>
+    <link rel="stylesheet" href="style.css?v=lamp-gaze-room-1" />
+    <script src="script.js?v=lamp-gaze-room-1" defer></script>
   </head>
   <body>
     <main class="screen">
@@ -34,7 +34,8 @@
       <section id="grass-game" class="grass-game" aria-label="Grass scene" hidden>
         <canvas id="grass-canvas" class="grass-canvas" aria-label="Three-dimensional grass model"></canvas>
         <p id="grass-status" class="grass-status" role="status" aria-live="polite"></p>
-        <p class="grass-controls">WASD / arrows to move · drag to look · lamp is on</p>
+        <span class="grass-reticle" aria-hidden="true"></span>
+        <p id="grass-controls" class="grass-controls">WASD / arrows to move · drag to look · keep the lamp in view for 3 seconds</p>
         <button id="back-button" class="back-button" type="button">Back to menu</button>
       </section>
     </main>

@@ -29,7 +29,7 @@ jobs:
         run: |
           mkdir _site
           cp index.html style.css script.js skull-background.png Volter-Goldfish.ttf _site/
-          cp -R grass lamp _site/
+          cp -R grass lamp couch living-room _site/
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v3
         with:
