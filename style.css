@@ -61,17 +61,23 @@ body {
 
 .menu-title {
   position: absolute;
-  z-index: 2;
-  top: clamp(1rem, 6vh, 4rem);
-  left: 0;
-  width: 100%;
+  z-index: 3;
+  top: clamp(1.5rem, 7vh, 5rem);
+  left: 50%;
+  width: max-content;
+  max-width: calc(100% - 2rem);
   margin: 0;
-  color: #f5e9ce;
+  padding: 0.15em 0.45em 0.2em;
+  border: 2px solid rgba(245, 233, 206, 0.75);
+  border-radius: 0.12em;
+  background: rgba(5, 5, 5, 0.88);
+  color: #fff8e8;
   font-family: "Creepster", cursive;
-  font-size: clamp(4rem, 13vw, 8rem);
+  font-size: clamp(4rem, 15vw, 9rem);
   letter-spacing: 0.12em;
   text-align: center;
-  text-shadow: 0 3px 0 #382d24, 0 0 18px rgba(245, 233, 206, 0.48);
+  text-shadow: 0 3px 0 #382d24, 0 0 20px rgba(245, 233, 206, 0.7);
+  transform: translateX(-50%);
 }
 
 .intro {
