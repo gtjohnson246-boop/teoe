@@ -179,7 +179,28 @@ body {
   font-size: clamp(2rem, 7vw, 3rem);
   letter-spacing: 0.08em;
   text-shadow: 0 0 12px rgba(255, 255, 255, 0.25), 0 0 30px rgba(255, 255, 255, 0.3);
-  opacity: 0;
-  transform: translateY(4px) scale(0.98);
+  animation: title-intro 2.2s ease-in-out both;
   user-select: none;
+}
+
+@keyframes title-intro {
+  0% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+
+  40% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  75% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-4px) scale(1.02);
+  }
 }

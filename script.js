@@ -1,4 +1,3 @@
-const title = document.getElementById('title');
 const intro = document.getElementById('intro');
 const menu = document.getElementById('menu');
 const playButton = document.getElementById('play-button');
@@ -7,48 +6,11 @@ const grassCanvas = document.getElementById('grass-canvas');
 const grassStatus = document.getElementById('grass-status');
 const backButton = document.getElementById('back-button');
 
-let alpha = 0;
-const fadeSpeed = (5 / 255) * 60;
-let fadingIn = true;
-let lastTime = 0;
-let completedCycles = 0;
 let introFinished = false;
 let grassScene = null;
 let grassLoading = false;
 let grassAnimationFrame = 0;
 let lastGrassFrame = 0;
-
-function animateFrame(time) {
-  if (introFinished) return;
-
-  const delta = lastTime === 0 ? 0 : (time - lastTime) / 1000;
-  lastTime = time;
-
-  if (fadingIn) {
-    alpha += fadeSpeed * delta;
-    if (alpha >= 1) {
-      alpha = 1;
-      fadingIn = false;
-    }
-  } else {
-    alpha -= fadeSpeed * delta;
-    if (alpha <= 0) {
-      alpha = 0;
-      fadingIn = true;
-      completedCycles += 1;
-    }
-  }
-
-  title.style.opacity = String(alpha);
-  title.style.transform = `translateY(${4 - alpha * 4}px) scale(${0.98 + alpha * 0.02})`;
-
-  if (completedCycles >= 1) {
-    finishIntro();
-    return;
-  }
-
-  requestAnimationFrame(animateFrame);
-}
 
 function finishIntro() {
   if (introFinished) return;
@@ -58,7 +20,7 @@ function finishIntro() {
   menu.hidden = false;
 }
 
-window.setTimeout(finishIntro, 4000);
+window.setTimeout(finishIntro, 2200);
 
 async function createGrassScene() {
   const [
@@ -189,5 +151,3 @@ backButton.addEventListener('click', () => {
 });
 
 window.addEventListener('resize', resizeGrassScene);
-
-requestAnimationFrame(animateFrame);
