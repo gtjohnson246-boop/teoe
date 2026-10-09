@@ -488,24 +488,32 @@ function renderGrass(time) {
     - Number(movementKeys.has('KeyS') || movementKeys.has('ArrowDown'));
   const strafe = Number(movementKeys.has('KeyD') || movementKeys.has('ArrowRight'))
     - Number(movementKeys.has('KeyA') || movementKeys.has('ArrowLeft'));
-  const length = Math.hypot(forward, strafe) || 1;
-  const speed = (grassScene.livingRoom ? 2.5 : 7) * delta / length;
-  const forwardX = -Math.sin(cameraYaw);
-  const forwardZ = -Math.cos(cameraYaw);
-  const rightX = Math.cos(cameraYaw);
-  const rightZ = -Math.sin(cameraYaw);
   const minX = grassScene.livingRoom?.minX ?? -fieldHalfSize;
   const maxX = grassScene.livingRoom?.maxX ?? fieldHalfSize;
   const minZ = grassScene.livingRoom?.minZ ?? -fieldHalfSize;
   const maxZ = grassScene.livingRoom?.maxZ ?? fieldHalfSize;
-  grassScene.camera.position.x = Math.max(
-    minX,
-    Math.min(maxX, grassScene.camera.position.x + (forward * forwardX + strafe * rightX) * speed)
-  );
-  grassScene.camera.position.z = Math.max(
-    minZ,
-    Math.min(maxZ, grassScene.camera.position.z + (forward * forwardZ + strafe * rightZ) * speed)
-  );
+
+  if (grassScene.livingRoom) {
+    grassScene.camera.position.x = 0;
+    grassScene.camera.position.z = 1.6;
+    grassScene.camera.position.y = 0.82;
+  } else {
+    const length = Math.hypot(forward, strafe) || 1;
+    const speed = 7 * delta / length;
+    const forwardX = -Math.sin(cameraYaw);
+    const forwardZ = -Math.cos(cameraYaw);
+    const rightX = Math.cos(cameraYaw);
+    const rightZ = -Math.sin(cameraYaw);
+    grassScene.camera.position.x = Math.max(
+      minX,
+      Math.min(maxX, grassScene.camera.position.x + (forward * forwardX + strafe * rightX) * speed)
+    );
+    grassScene.camera.position.z = Math.max(
+      minZ,
+      Math.min(maxZ, grassScene.camera.position.z + (forward * forwardZ + strafe * rightZ) * speed)
+    );
+  }
+
   grassScene.camera.rotation.set(cameraPitch, cameraYaw, 0, 'YXZ');
   grassScene.windUniforms.time.value = time * 0.001;
   if (!grassScene.livingRoom && !enteringLivingRoom) {
@@ -532,7 +540,7 @@ function renderGrass(time) {
             .then((livingRoom) => {
               grassScene.livingRoom = livingRoom;
               setSeatedLivingRoomView();
-              grassControls.textContent = 'WASD / arrows to move · drag to look around the living room from the couch';
+              grassControls.textContent = 'Drag to look around the living room from the couch';
               grassStatus.textContent = '';
             })
             .catch((error) => {
@@ -579,7 +587,7 @@ playButton.addEventListener('click', async () => {
   if (grassScene) {
     if (grassScene.livingRoom) {
       setSeatedLivingRoomView();
-      grassControls.textContent = 'WASD / arrows to move · drag to look around the living room from the couch';
+      grassControls.textContent = 'Drag to look around the living room from the couch';
     } else {
       cameraYaw = grassScene.spawnYaw;
       cameraPitch = grassScene.spawnPitch;
