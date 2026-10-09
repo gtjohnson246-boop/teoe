@@ -13,6 +13,11 @@ let grassAnimationFrame = 0;
 let lastGrassFrame = 0;
 const movementKeys = new Set();
 const fieldHalfSize = 52;
+let cameraYaw = 0;
+let cameraPitch = 0;
+let lookPointerId = null;
+let lastLookX = 0;
+let lastLookY = 0;
 
 function finishIntro() {
   if (introFinished) return;
@@ -31,6 +36,8 @@ async function createGrassScene() {
       AmbientLight,
       Color,
       DirectionalLight,
+      DoubleSide,
+      Euler,
       Fog,
       InstancedMesh,
       Matrix4,
@@ -90,8 +97,8 @@ async function createGrassScene() {
     });
     return sources;
   });
-  const fieldRows = 56;
-  const spacing = 1.8;
+  const fieldRows = 80;
+  const spacing = 1.3;
   const random = () => Math.random();
   const positionsByVariant = variants.map(() => []);
 
@@ -137,9 +144,50 @@ async function createGrassScene() {
     }
   });
 
+  const bladeGeometry = new PlaneGeometry(0.075, 0.42, 1, 2);
+  bladeGeometry.translate(0, 0.21, 0);
+  const bladeMaterial = new MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.9,
+    side: DoubleSide,
+    vertexColors: false
+  });
+  const bladeCount = 30000;
+  const blades = new InstancedMesh(bladeGeometry, bladeMaterial, bladeCount);
+  blades.name = 'Fine grass blades';
+  blades.frustumCulled = false;
+  const bladeMatrix = new Matrix4();
+  const bladeRotation = new Quaternion();
+  const bladeEuler = new Euler();
+  const bladePosition = new Vector3();
+  const bladeScale = new Vector3();
+  const bladeColor = new Color();
+  const greenPalette = [0x718c35, 0x819b3e, 0x96a949, 0x5e792d, 0xa0ad52];
+
+  for (let index = 0; index < bladeCount; index += 1) {
+    const x = (random() - 0.5) * fieldRows * spacing;
+    const z = (random() - 0.5) * fieldRows * spacing;
+    bladePosition.set(x, 0, z);
+    bladeEuler.set(
+      (random() - 0.5) * 0.28,
+      random() * Math.PI * 2,
+      (random() - 0.5) * 0.3,
+      'YXZ'
+    );
+    bladeRotation.setFromEuler(bladeEuler);
+    bladeScale.set(0.75 + random() * 0.65, 0.65 + random() * 0.8, 1);
+    bladeMatrix.compose(bladePosition, bladeRotation, bladeScale);
+    blades.setMatrixAt(index, bladeMatrix);
+    bladeColor.setHex(greenPalette[Math.floor(random() * greenPalette.length)]);
+    blades.setColorAt(index, bladeColor);
+  }
+  blades.instanceMatrix.needsUpdate = true;
+  if (blades.instanceColor) blades.instanceColor.needsUpdate = true;
+  scene.add(blades);
+
   const camera = new PerspectiveCamera(72, 1, 0.1, 140);
   camera.position.set(0, 1.45, 0);
-  camera.lookAt(0, 1.45, -1);
+  camera.rotation.order = 'YXZ';
 
   return { renderer, scene, camera };
 }
@@ -168,14 +216,19 @@ function renderGrass(time) {
     - Number(movementKeys.has('KeyA') || movementKeys.has('ArrowLeft'));
   const length = Math.hypot(forward, strafe) || 1;
   const speed = 7 * delta / length;
+  const forwardX = -Math.sin(cameraYaw);
+  const forwardZ = -Math.cos(cameraYaw);
+  const rightX = Math.cos(cameraYaw);
+  const rightZ = -Math.sin(cameraYaw);
   grassScene.camera.position.x = Math.max(
     -fieldHalfSize,
-    Math.min(fieldHalfSize, grassScene.camera.position.x + strafe * speed)
+    Math.min(fieldHalfSize, grassScene.camera.position.x + (forward * forwardX + strafe * rightX) * speed)
   );
   grassScene.camera.position.z = Math.max(
     -fieldHalfSize,
-    Math.min(fieldHalfSize, grassScene.camera.position.z - forward * speed)
+    Math.min(fieldHalfSize, grassScene.camera.position.z + (forward * forwardZ + strafe * rightZ) * speed)
   );
+  grassScene.camera.rotation.set(cameraPitch, cameraYaw, 0, 'YXZ');
   grassScene.renderer.render(grassScene.scene, grassScene.camera);
   grassAnimationFrame = requestAnimationFrame(renderGrass);
 }
@@ -192,6 +245,8 @@ playButton.addEventListener('click', async () => {
   menu.hidden = true;
   grassGame.hidden = false;
   movementKeys.clear();
+  cameraYaw = 0;
+  cameraPitch = 0;
   grassStatus.textContent = '';
   grassStatus.removeAttribute('data-error');
 
@@ -222,10 +277,47 @@ backButton.addEventListener('click', () => {
   grassGame.hidden = true;
   menu.hidden = false;
   movementKeys.clear();
+  lookPointerId = null;
+  grassCanvas.classList.remove('is-looking');
   cancelAnimationFrame(grassAnimationFrame);
   grassAnimationFrame = 0;
   lastGrassFrame = 0;
 });
+
+grassCanvas.addEventListener('pointerdown', (event) => {
+  if (!event.isPrimary || event.button !== 0) return;
+
+  lookPointerId = event.pointerId;
+  lastLookX = event.clientX;
+  lastLookY = event.clientY;
+  grassCanvas.classList.add('is-looking');
+  grassCanvas.setPointerCapture(event.pointerId);
+  event.preventDefault();
+});
+
+grassCanvas.addEventListener('pointermove', (event) => {
+  if (event.pointerId !== lookPointerId) return;
+
+  const deltaX = event.clientX - lastLookX;
+  const deltaY = event.clientY - lastLookY;
+  lastLookX = event.clientX;
+  lastLookY = event.clientY;
+  cameraYaw -= deltaX * 0.004;
+  cameraPitch = Math.max(-1.25, Math.min(1.25, cameraPitch - deltaY * 0.004));
+});
+
+function stopLooking(event) {
+  if (event.pointerId !== lookPointerId) return;
+
+  lookPointerId = null;
+  grassCanvas.classList.remove('is-looking');
+  if (grassCanvas.hasPointerCapture(event.pointerId)) {
+    grassCanvas.releasePointerCapture(event.pointerId);
+  }
+}
+
+grassCanvas.addEventListener('pointerup', stopLooking);
+grassCanvas.addEventListener('pointercancel', stopLooking);
 
 window.addEventListener('keydown', (event) => {
   if (grassGame.hidden) return;

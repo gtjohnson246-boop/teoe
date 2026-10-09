@@ -134,6 +134,12 @@ body {
   display: block;
   width: 100%;
   height: 100%;
+  cursor: grab;
+  touch-action: none;
+}
+
+.grass-canvas.is-looking {
+  cursor: grabbing;
 }
 
 .grass-status {
