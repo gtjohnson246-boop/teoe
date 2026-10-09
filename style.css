@@ -52,14 +52,12 @@ body {
   top: 50%;
   left: 50%;
   display: block;
-  width: min(94vw, 400px);
-  height: min(88vh, 700px);
-  height: min(88dvh, 700px);
+  width: min(100vw, 100dvh);
+  height: min(100vw, 100dvh);
   object-fit: contain;
-  opacity: 1;
+  opacity: 0.18;
   pointer-events: none;
   transform: translate(-50%, -50%);
-  filter: drop-shadow(0 0 14px rgba(239, 218, 181, 0.4));
 }
 
 .menu-title {
@@ -71,16 +69,15 @@ body {
   max-width: calc(100% - 2rem);
   margin: 0;
   padding: 0.15em 0.45em 0.2em;
-  border: 1px solid rgba(245, 233, 206, 0.35);
+  border: 1px solid rgba(245, 233, 206, 0.7);
   border-radius: 0.12em;
-  background: rgba(5, 5, 5, 0.52);
-  color: rgba(245, 233, 206, 0.62);
+  background: rgba(5, 5, 5, 0.82);
+  color: #fff8e8;
   font-family: "Creepster", cursive;
-  font-size: clamp(2.5rem, 8vw, 5rem);
+  font-size: clamp(3rem, 10vw, 6rem);
   letter-spacing: 0.12em;
   text-align: center;
-  text-shadow: 0 2px 0 rgba(56, 45, 36, 0.5), 0 0 12px rgba(245, 233, 206, 0.28);
-  opacity: 0.72;
+  text-shadow: 0 3px 0 #382d24, 0 0 20px rgba(245, 233, 206, 0.7);
   transform: translateX(-50%);
 }
 
