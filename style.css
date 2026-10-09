@@ -159,6 +159,25 @@ body {
   color: #ffd0c7;
 }
 
+.grass-controls {
+  position: absolute;
+  z-index: 1;
+  bottom: 1rem;
+  left: 50%;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(245, 233, 206, 0.45);
+  border-radius: 0.12em;
+  background: rgba(5, 5, 5, 0.55);
+  color: #fff8e8;
+  font-family: "Volter Goldfish", sans-serif;
+  font-size: 1rem;
+  text-align: center;
+  text-shadow: 0 1px 5px #000;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
 .back-button {
   position: absolute;
   z-index: 2;
