@@ -1,7 +1,7 @@
 # teoe
-This is a FNAF-inspired game prototype with a simple fade-in/fade-out title animation.
+This is a FNAF-inspired game prototype. The browser version displays the skeleton menu artwork.
 
-The project now includes both a desktop build and a browser version for easy hosting.
+The project includes both a desktop build and a browser version for easy hosting.
 
 Desktop version:
 - Install the C++ SFML toolchain if needed.
