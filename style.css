@@ -43,13 +43,35 @@ body {
     #050505;
 }
 
-.menu::before {
+.skeleton-art {
   position: absolute;
-  z-index: -1;
-  inset: 2vh 0 0;
-  background: url("skeleton.svg") center center / contain no-repeat;
-  content: "";
-  opacity: 0.68;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  display: block;
+  width: min(94vw, 400px);
+  height: min(88vh, 700px);
+  height: min(88dvh, 700px);
+  object-fit: contain;
+  opacity: 1;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 14px rgba(239, 218, 181, 0.4));
+}
+
+.menu-title {
+  position: absolute;
+  z-index: 2;
+  top: clamp(1rem, 6vh, 4rem);
+  left: 0;
+  width: 100%;
+  margin: 0;
+  color: #f5e9ce;
+  font-family: "Creepster", cursive;
+  font-size: clamp(4rem, 13vw, 8rem);
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-shadow: 0 3px 0 #382d24, 0 0 18px rgba(245, 233, 206, 0.48);
 }
 
 .intro {
@@ -66,16 +88,4 @@ body {
   opacity: 0;
   transform: translateY(4px) scale(0.98);
   user-select: none;
-}
-
-.menu-title {
-  margin: 0;
-  align-self: start;
-  padding-top: 9vh;
-  color: #f5e9ce;
-  font-family: "Creepster", cursive;
-  font-size: clamp(4rem, 13vw, 8rem);
-  letter-spacing: 0.12em;
-  text-align: center;
-  text-shadow: 0 3px 0 #382d24, 0 0 18px rgba(245, 233, 206, 0.48);
 }
