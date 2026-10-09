@@ -484,9 +484,9 @@ function renderGrass(time) {
 
   const delta = lastGrassFrame === 0 ? 0 : Math.min((time - lastGrassFrame) / 1000, 0.05);
   lastGrassFrame = time;
-  const forward = Number(movementKeys.has('KeyW') || movementKeys.has('ArrowUp'))
+  let forward = Number(movementKeys.has('KeyW') || movementKeys.has('ArrowUp'))
     - Number(movementKeys.has('KeyS') || movementKeys.has('ArrowDown'));
-  const strafe = Number(movementKeys.has('KeyD') || movementKeys.has('ArrowRight'))
+  let strafe = Number(movementKeys.has('KeyD') || movementKeys.has('ArrowRight'))
     - Number(movementKeys.has('KeyA') || movementKeys.has('ArrowLeft'));
   const minX = grassScene.livingRoom?.minX ?? -fieldHalfSize;
   const maxX = grassScene.livingRoom?.maxX ?? fieldHalfSize;
@@ -494,6 +494,9 @@ function renderGrass(time) {
   const maxZ = grassScene.livingRoom?.maxZ ?? fieldHalfSize;
 
   if (grassScene.livingRoom) {
+    movementKeys.clear();
+    forward = 0;
+    strafe = 0;
     grassScene.camera.position.x = 0;
     grassScene.camera.position.z = 1.6;
     grassScene.camera.position.y = 0.82;
