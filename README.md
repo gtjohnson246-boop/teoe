@@ -1,5 +1,5 @@
 # teoe
-This is a FNAF-inspired game prototype. The browser version shows a short fading title intro before the teoe menu, with a low-contrast skull image in the background.
+This is a FNAF-inspired game prototype. The browser version shows a short Creepster-font intro before the teoe menu, which uses the bundled Volter Goldfish font over a low-contrast skull image.
 
 The project includes both a desktop build and a browser version for easy hosting.
 

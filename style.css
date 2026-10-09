@@ -2,6 +2,14 @@
   --bg: #050505;
 }
 
+@font-face {
+  font-family: "Volter Goldfish";
+  src: url("Volter-Goldfish.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -73,7 +81,7 @@ body {
   border-radius: 0.12em;
   background: rgba(5, 5, 5, 0.82);
   color: #fff8e8;
-  font-family: "Creepster", cursive;
+  font-family: "Volter Goldfish", sans-serif;
   font-size: clamp(3rem, 10vw, 6rem);
   letter-spacing: 0.12em;
   text-align: center;
