@@ -11,9 +11,10 @@ Desktop version:
 - For a windowed preview: `./app --window`
 
 Browser version:
-- Open `index.html` directly in a browser, or serve the project locally:
+- Serve the project locally (required for the 3D grass model's asset loading):
   `python3 -m http.server 8000`
 - Then visit: `http://localhost:8000`
+- The grass scene uses Three.js from a CDN, so an internet connection is needed when opening it for the first time.
 
 GitHub Pages:
 - The site deploys from the `main` branch via the workflow in `.github/workflows/pages.yml`.

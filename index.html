@@ -8,8 +8,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Creepster&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=volter-title-2" />
-    <script src="script.js?v=teoe-title-2" defer></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.180.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.180.0/examples/jsm/"
+        }
+      }
+    </script>
+    <link rel="stylesheet" href="style.css?v=grass-play-1" />
+    <script src="script.js?v=grass-play-1" defer></script>
   </head>
   <body>
     <main class="screen">
@@ -18,7 +26,15 @@
       </section>
       <section id="menu" class="menu" aria-label="Main menu" hidden>
         <img class="skeleton-art" src="skull-background.png" alt="Low-contrast black-and-white skull" />
-        <h1 class="menu-title">teoe</h1>
+        <div class="menu-content">
+          <h1 class="menu-title">teoe</h1>
+          <button id="play-button" class="play-button" type="button">Play</button>
+        </div>
+      </section>
+      <section id="grass-game" class="grass-game" aria-label="Grass scene" hidden>
+        <canvas id="grass-canvas" class="grass-canvas" aria-label="Three-dimensional grass model"></canvas>
+        <p id="grass-status" class="grass-status" role="status" aria-live="polite"></p>
+        <button id="back-button" class="back-button" type="button">Back to menu</button>
       </section>
     </main>
   </body>

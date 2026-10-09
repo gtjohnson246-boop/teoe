@@ -40,7 +40,8 @@ body {
 }
 
 .intro,
-.menu {
+.menu,
+.grass-game {
   position: relative;
   display: grid;
   width: 100%;
@@ -69,10 +70,7 @@ body {
 }
 
 .menu-title {
-  position: absolute;
-  z-index: 3;
-  top: clamp(1.5rem, 7vh, 5rem);
-  left: 50%;
+  position: relative;
   width: max-content;
   max-width: calc(100% - 2rem);
   margin: 0;
@@ -86,7 +84,88 @@ body {
   letter-spacing: 0.12em;
   text-align: center;
   text-shadow: 0 3px 0 #382d24, 0 0 20px rgba(245, 233, 206, 0.7);
+}
+
+.menu-content {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(1.25rem, 4vh, 2rem);
+  padding: 2rem 1rem;
+}
+
+.play-button,
+.back-button {
+  min-width: 9rem;
+  padding: 0.65rem 1.25rem 0.75rem;
+  border: 1px solid rgba(245, 233, 206, 0.8);
+  border-radius: 0.12em;
+  background: rgba(5, 5, 5, 0.88);
+  color: #fff8e8;
+  font-family: "Volter Goldfish", sans-serif;
+  font-size: clamp(1.25rem, 4vw, 1.75rem);
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 12px rgba(245, 233, 206, 0.5);
+  cursor: pointer;
+}
+
+.play-button:hover,
+.back-button:hover {
+  background: rgba(75, 65, 48, 0.92);
+}
+
+.play-button:focus-visible,
+.back-button:focus-visible {
+  outline: 3px solid #fff8e8;
+  outline-offset: 4px;
+}
+
+.grass-game {
+  background:
+    radial-gradient(ellipse at 50% 55%, rgba(76, 106, 46, 0.28), transparent 58%),
+    #10150d;
+}
+
+.grass-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.grass-status {
+  position: absolute;
+  z-index: 1;
+  top: 1rem;
+  left: 50%;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  color: #fff8e8;
+  font-family: "Volter Goldfish", sans-serif;
+  font-size: 1rem;
+  text-align: center;
+  text-shadow: 0 1px 5px #000;
   transform: translateX(-50%);
+}
+
+.grass-status:empty {
+  display: none;
+}
+
+.grass-status[data-error="true"] {
+  color: #ffd0c7;
+}
+
+.back-button {
+  position: absolute;
+  z-index: 2;
+  top: 1rem;
+  right: 1rem;
+  min-width: auto;
+  font-size: 1rem;
 }
 
 .intro {
