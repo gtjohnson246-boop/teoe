@@ -16,7 +16,7 @@ Browser version:
 - Then visit: `http://localhost:8000`
 - The grass scene uses Three.js from a CDN, so an internet connection is needed when opening it for the first time.
 - In the grass field, use WASD or the arrow keys to move, and drag to turn the camera. Grass is rendered in view-cullable patches with lightweight cutout foliage and gentle wind.
-- The field opens at night facing the table lamp; its bulb and light grow brighter over time.
+- The field opens at night facing a table lamp on a small table; the bulb and light gradually brighten while the lamp stays recognizable.
 
 GitHub Pages:
 - The site deploys from the `main` branch via the workflow in `.github/workflows/pages.yml`.
