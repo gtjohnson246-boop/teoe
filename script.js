@@ -458,6 +458,14 @@ async function createGrassScene() {
   };
 }
 
+function setSeatedLivingRoomView() {
+  if (!grassScene) return;
+
+  grassScene.camera.position.set(0, 0.82, 1.6);
+  cameraYaw = 0;
+  cameraPitch = Math.atan2(0.7 - 0.82, 2.2);
+}
+
 function resizeGrassScene() {
   if (!grassScene) return;
 
@@ -523,10 +531,8 @@ function renderGrass(time) {
           void grassScene.loadLivingRoom()
             .then((livingRoom) => {
               grassScene.livingRoom = livingRoom;
-              grassScene.camera.position.set(0, 1.45, 1.5);
-              cameraYaw = 0;
-              cameraPitch = Math.atan2(0.9 - 1.45, 2.4);
-              grassControls.textContent = 'WASD / arrows to move · drag to look around the living room';
+              setSeatedLivingRoomView();
+              grassControls.textContent = 'WASD / arrows to move · drag to look around the living room from the couch';
               grassStatus.textContent = '';
             })
             .catch((error) => {
@@ -572,10 +578,8 @@ playButton.addEventListener('click', async () => {
 
   if (grassScene) {
     if (grassScene.livingRoom) {
-      grassScene.camera.position.set(0, 1.45, 1.5);
-      cameraYaw = 0;
-      cameraPitch = Math.atan2(0.9 - 1.45, 2.4);
-      grassControls.textContent = 'WASD / arrows to move · drag to look around the living room';
+      setSeatedLivingRoomView();
+      grassControls.textContent = 'WASD / arrows to move · drag to look around the living room from the couch';
     } else {
       cameraYaw = grassScene.spawnYaw;
       cameraPitch = grassScene.spawnPitch;
