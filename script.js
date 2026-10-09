@@ -18,6 +18,7 @@ let cameraPitch = 0;
 let lookPointerId = null;
 let lastLookX = 0;
 let lastLookY = 0;
+let lampElapsed = 0;
 
 function finishIntro() {
   if (introFinished) return;
@@ -33,6 +34,8 @@ async function createGrassScene() {
   const [
     {
       ACESFilmicToneMapping,
+      Box3,
+      BufferGeometry,
       CanvasTexture,
       Color,
       DirectionalLight,
@@ -40,6 +43,7 @@ async function createGrassScene() {
       Euler,
       Float32BufferAttribute,
       Fog,
+      Group,
       HemisphereLight,
       InstancedMesh,
       Matrix4,
@@ -47,6 +51,9 @@ async function createGrassScene() {
       MeshStandardMaterial,
       PerspectiveCamera,
       PlaneGeometry,
+      PointLight,
+      Points,
+      PointsMaterial,
       Quaternion,
       RepeatWrapping,
       Scene,
@@ -62,9 +69,13 @@ async function createGrassScene() {
 
   const random = () => Math.random();
   const loader = new GLTFLoader();
-  const gltf = await new Promise((resolve, reject) => {
-    loader.load('grass/tdcrdbur_tier_3.gltf', resolve, undefined, reject);
+  const loadModel = (path) => new Promise((resolve, reject) => {
+    loader.load(path, resolve, undefined, reject);
   });
+  const [gltf, lampGltf] = await Promise.all([
+    loadModel('grass/tdcrdbur_tier_3.gltf'),
+    loadModel('lamp/scene.gltf')
+  ]);
   gltf.scene.updateMatrixWorld(true);
   const variants = gltf.scene.children.filter((child) => /^SM_tdcrdbur_Var[A-F]$/.test(child.name));
   if (variants.length === 0) {
@@ -78,13 +89,28 @@ async function createGrassScene() {
   renderer.toneMappingExposure = 1.2;
 
   const scene = new Scene();
-  scene.background = new Color(0xa5bd83);
-  scene.fog = new Fog(0xa5bd83, 38, 115);
-  scene.add(new HemisphereLight(0xdde9c1, 0x51503a, 2.1));
+  scene.background = new Color(0x050914);
+  scene.fog = new Fog(0x080e1a, 32, 105);
+  scene.add(new HemisphereLight(0x182844, 0x11140e, 0.32));
 
-  const sunlight = new DirectionalLight(0xfff2d6, 2.5);
-  sunlight.position.set(-30, 45, 20);
-  scene.add(sunlight);
+  const moonlight = new DirectionalLight(0x879ac4, 0.18);
+  moonlight.position.set(-30, 45, 20);
+  scene.add(moonlight);
+
+  const starPositions = [];
+  for (let index = 0; index < 420; index += 1) {
+    starPositions.push(
+      (random() - 0.5) * 140,
+      12 + random() * 38,
+      (random() - 0.5) * 140
+    );
+  }
+  const starGeometry = new BufferGeometry();
+  starGeometry.setAttribute('position', new Float32BufferAttribute(starPositions, 3));
+  scene.add(new Points(
+    starGeometry,
+    new PointsMaterial({ color: 0xb8c8e8, size: 0.13, sizeAttenuation: false })
+  ));
 
   const groundCanvas = document.createElement('canvas');
   groundCanvas.width = 256;
@@ -120,11 +146,49 @@ async function createGrassScene() {
 
   const ground = new Mesh(
     new PlaneGeometry(120, 120),
-    new MeshStandardMaterial({ map: groundTexture, roughness: 1 })
+    new MeshStandardMaterial({ map: groundTexture, color: 0x647092, roughness: 1 })
   );
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.06;
   scene.add(ground);
+
+  const lampModel = lampGltf.scene;
+  const lampBulb = lampModel.getObjectByName('Lightbulb_Table_Lamp_0')
+    ?? lampModel.getObjectByName('Lightbulb');
+  if (!lampBulb) {
+    throw new Error('The lamp model is missing its bulb mesh.');
+  }
+
+  const lampMaterials = [];
+  lampBulb.traverse((object) => {
+    if (!object.isMesh) return;
+    const makeGlowingMaterial = (material) => {
+      const glowingMaterial = material.clone();
+      glowingMaterial.emissive.set(0xffb84a);
+      glowingMaterial.emissiveIntensity = 0.15;
+      lampMaterials.push(glowingMaterial);
+      return glowingMaterial;
+    };
+    object.material = Array.isArray(object.material)
+      ? object.material.map(makeGlowingMaterial)
+      : makeGlowingMaterial(object.material);
+  });
+
+  const lampBounds = new Box3().setFromObject(lampModel);
+  const lampCenter = lampBounds.getCenter(new Vector3());
+  lampModel.position.set(-lampCenter.x, -lampBounds.min.y, -lampCenter.z);
+  const lampRoot = new Group();
+  lampRoot.add(lampModel);
+  lampRoot.scale.setScalar(0.065);
+  lampRoot.position.set(0, 0, -4.5);
+  scene.add(lampRoot);
+  lampRoot.updateMatrixWorld(true);
+
+  const bulbBounds = new Box3().setFromObject(lampBulb);
+  const lampLight = new PointLight(0xffb84a, 0.35, 30, 2);
+  lampLight.position.copy(bulbBounds.getCenter(new Vector3()));
+  lampLight.position.y += 0.12;
+  scene.add(lampLight);
 
   const variantSources = variants.map((variant) => {
     const sources = [];
@@ -294,7 +358,7 @@ async function createGrassScene() {
   camera.position.set(0, 1.45, 0);
   camera.rotation.order = 'YXZ';
 
-  return { renderer, scene, camera, windUniforms };
+  return { renderer, scene, camera, windUniforms, lampLight, lampMaterials };
 }
 
 function resizeGrassScene() {
@@ -315,6 +379,7 @@ function renderGrass(time) {
 
   const delta = lastGrassFrame === 0 ? 0 : Math.min((time - lastGrassFrame) / 1000, 0.05);
   lastGrassFrame = time;
+  lampElapsed += delta;
   const forward = Number(movementKeys.has('KeyW') || movementKeys.has('ArrowUp'))
     - Number(movementKeys.has('KeyS') || movementKeys.has('ArrowDown'));
   const strafe = Number(movementKeys.has('KeyD') || movementKeys.has('ArrowRight'))
@@ -335,6 +400,11 @@ function renderGrass(time) {
   );
   grassScene.camera.rotation.set(cameraPitch, cameraYaw, 0, 'YXZ');
   grassScene.windUniforms.time.value = time * 0.001;
+  grassScene.lampLight.intensity = Math.min(0.35 + lampElapsed * 0.28, 16);
+  const bulbGlow = Math.min(0.15 + lampElapsed * 0.06, 4);
+  grassScene.lampMaterials.forEach((material) => {
+    material.emissiveIntensity = bulbGlow;
+  });
   grassScene.renderer.render(grassScene.scene, grassScene.camera);
   grassAnimationFrame = requestAnimationFrame(renderGrass);
 }
@@ -353,6 +423,7 @@ playButton.addEventListener('click', async () => {
   movementKeys.clear();
   cameraYaw = 0;
   cameraPitch = 0;
+  lampElapsed = 0;
   grassStatus.textContent = '';
   grassStatus.removeAttribute('data-error');
 
@@ -363,7 +434,7 @@ playButton.addEventListener('click', async () => {
 
   if (grassLoading) return;
   grassLoading = true;
-  grassStatus.textContent = 'Loading grass...';
+  grassStatus.textContent = 'Loading the field and lamp...';
 
   try {
     grassScene = await createGrassScene();
@@ -371,8 +442,8 @@ playButton.addEventListener('click', async () => {
     startGrassScene();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error('Could not load the grass scene:', error);
-    grassStatus.textContent = `Could not load grass: ${message}`;
+    console.error('Could not load the grass field and lamp:', error);
+    grassStatus.textContent = `Could not load the field and lamp: ${message}`;
     grassStatus.dataset.error = 'true';
   } finally {
     grassLoading = false;
