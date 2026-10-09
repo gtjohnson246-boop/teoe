@@ -12,12 +12,15 @@ const fadeSpeed = (5 / 255) * 60;
 let fadingIn = true;
 let lastTime = 0;
 let completedCycles = 0;
+let introFinished = false;
 let grassScene = null;
 let grassLoading = false;
 let grassAnimationFrame = 0;
 let lastGrassFrame = 0;
 
 function animateFrame(time) {
+  if (introFinished) return;
+
   const delta = lastTime === 0 ? 0 : (time - lastTime) / 1000;
   lastTime = time;
 
@@ -39,14 +42,23 @@ function animateFrame(time) {
   title.style.opacity = String(alpha);
   title.style.transform = `translateY(${4 - alpha * 4}px) scale(${0.98 + alpha * 0.02})`;
 
-  if (completedCycles === 2) {
-    intro.hidden = true;
-    menu.hidden = false;
+  if (completedCycles >= 1) {
+    finishIntro();
     return;
   }
 
   requestAnimationFrame(animateFrame);
 }
+
+function finishIntro() {
+  if (introFinished) return;
+
+  introFinished = true;
+  intro.hidden = true;
+  menu.hidden = false;
+}
+
+window.setTimeout(finishIntro, 4000);
 
 async function createGrassScene() {
   const [
