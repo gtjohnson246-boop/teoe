@@ -1,5 +1,5 @@
 # teoe
-This is a FNAF-inspired game prototype. The browser version shows a short fading title intro before the skeleton menu title.
+This is a FNAF-inspired game prototype. The browser version shows a short fading title intro before the teoe menu, with original skeleton artwork in the background.
 
 The project includes both a desktop build and a browser version for easy hosting.
 

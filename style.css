@@ -31,10 +31,25 @@ body {
 
 .intro,
 .menu {
+  position: relative;
   display: grid;
   min-height: 100vh;
   min-height: 100dvh;
   place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(ellipse at 50% 46%, rgba(91, 82, 67, 0.24), transparent 48%),
+    #050505;
+}
+
+.menu::before {
+  position: absolute;
+  z-index: -1;
+  inset: 2vh 0 0;
+  background: url("skeleton.svg") center center / contain no-repeat;
+  content: "";
+  opacity: 0.68;
 }
 
 .intro {
@@ -55,10 +70,12 @@ body {
 
 .menu-title {
   margin: 0;
-  color: #f5f5f5;
+  align-self: start;
+  padding-top: 9vh;
+  color: #f5e9ce;
   font-family: "Creepster", cursive;
-  font-size: clamp(2.5rem, 9vw, 5rem);
-  letter-spacing: 0.08em;
+  font-size: clamp(4rem, 13vw, 8rem);
+  letter-spacing: 0.12em;
   text-align: center;
-  text-shadow: 0 0 16px rgba(255, 255, 255, 0.35);
+  text-shadow: 0 3px 0 #382d24, 0 0 18px rgba(245, 233, 206, 0.48);
 }
