@@ -678,6 +678,7 @@ window.addEventListener('keydown', (event) => {
   if (!movementCode) return;
 
   event.preventDefault();
+  if (grassScene?.livingRoom) return;
   movementKeys.add(event.code);
 });
 
