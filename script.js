@@ -6,6 +6,8 @@ const grassCanvas = document.getElementById('grass-canvas');
 const grassStatus = document.getElementById('grass-status');
 const grassControls = document.getElementById('grass-controls');
 const backButton = document.getElementById('back-button');
+const characterVoice = new Audio('audio/casual-male-voice.mp3');
+characterVoice.preload = 'auto';
 
 let introFinished = false;
 let grassScene = null;
@@ -23,6 +25,48 @@ let cameraPitch = 0;
 let lookPointerId = null;
 let lastLookX = 0;
 let lastLookY = 0;
+let voiceAudioContext = null;
+let voiceAnalyser = null;
+let voiceSource = null;
+let voiceWaveform = null;
+
+function unlockCharacterVoice() {
+  if (!window.AudioContext) return;
+
+  try {
+    if (!voiceAudioContext) {
+      voiceAudioContext = new AudioContext();
+      voiceAnalyser = voiceAudioContext.createAnalyser();
+      voiceAnalyser.fftSize = 256;
+      voiceWaveform = new Uint8Array(voiceAnalyser.fftSize);
+      voiceSource = voiceAudioContext.createMediaElementSource(characterVoice);
+      voiceSource.connect(voiceAnalyser);
+      voiceAnalyser.connect(voiceAudioContext.destination);
+    }
+
+    if (voiceAudioContext.state === 'suspended') {
+      void voiceAudioContext.resume().catch((error) => {
+        console.error('Could not enable character audio:', error);
+      });
+    }
+  } catch (error) {
+    console.error('Could not initialize character audio analysis:', error);
+  }
+}
+
+async function playCharacterVoice() {
+  if (voiceAudioContext?.state === 'suspended') {
+    await voiceAudioContext.resume();
+  }
+
+  characterVoice.currentTime = 0;
+  await characterVoice.play();
+}
+
+function stopCharacterVoice() {
+  characterVoice.pause();
+  characterVoice.currentTime = 0;
+}
 
 function finishIntro() {
   if (introFinished) return;
@@ -68,10 +112,12 @@ async function createGrassScene() {
       Vector3,
       WebGLRenderer
     },
-    { GLTFLoader }
+    { GLTFLoader },
+    { createCasualMale }
   ] = await Promise.all([
     import('three'),
-    import('three/addons/loaders/GLTFLoader.js')
+    import('three/addons/loaders/GLTFLoader.js'),
+    import('./casual-male.js')
   ]);
 
   const random = () => Math.random();
@@ -253,12 +299,79 @@ async function createGrassScene() {
     );
     roomScene.add(couch);
 
+    const character = createCasualMale();
+    character.root.position.set(0, 0, -0.75);
+    roomScene.add(character.root);
+
+    let encounterStartTime = null;
+    let voiceStarted = false;
+    let voiceError = false;
+    const beginEncounter = () => {
+      stopCharacterVoice();
+      encounterStartTime = performance.now();
+      voiceStarted = false;
+      voiceError = false;
+      grassStatus.textContent = 'A man reaches out and grabs you...';
+      grassStatus.removeAttribute('data-error');
+    };
+    const updateEncounter = (time) => {
+      if (encounterStartTime === null) return 0;
+
+      const elapsed = Math.max(0, (time - encounterStartTime) / 1000);
+      const approach = Math.max(0, Math.min(1, elapsed / 1.2));
+      const reach = Math.max(0, Math.min(1, (elapsed - 0.15) / 0.9));
+      const smoothReach = reach * reach * (3 - 2 * reach);
+      character.root.position.z = -0.75 + approach * 0.95;
+      character.root.position.y = Math.sin(elapsed * 4) * 0.012 * approach;
+      character.leftShoulder.rotation.x = -1.25 * smoothReach;
+      character.rightShoulder.rotation.x = -1.25 * smoothReach;
+      character.leftElbow.rotation.x = -0.65 * smoothReach;
+      character.rightElbow.rotation.x = -0.65 * smoothReach;
+      character.leftHand.rotation.x = -0.2 * smoothReach;
+      character.rightHand.rotation.x = -0.2 * smoothReach;
+
+      if (!voiceStarted && elapsed >= 1.15) {
+        voiceStarted = true;
+        grassStatus.textContent = 'The man is speaking...';
+        void playCharacterVoice().catch((error) => {
+          console.error('Could not play the character voice:', error);
+          voiceError = true;
+          grassStatus.textContent = 'Could not play the character audio. Check your browser audio settings.';
+          grassStatus.dataset.error = 'true';
+        });
+      }
+
+      let mouthOpening = 0;
+      if (voiceStarted && !characterVoice.paused && voiceAnalyser && voiceWaveform) {
+        voiceAnalyser.getByteTimeDomainData(voiceWaveform);
+        let amplitude = 0;
+        for (const sample of voiceWaveform) {
+          const centered = (sample - 128) / 128;
+          amplitude += centered * centered;
+        }
+        mouthOpening = Math.min(1, Math.max(0, (Math.sqrt(amplitude / voiceWaveform.length) - 0.015) * 8));
+      } else if (voiceStarted && !characterVoice.paused) {
+        mouthOpening = 0.15 + Math.abs(Math.sin(time * 0.018)) * 0.3;
+      }
+      character.mouth.scale.y = 0.35 + mouthOpening * 2.1;
+      character.head.rotation.x = Math.sin(time * 0.003) * mouthOpening * 0.08;
+
+      if (voiceStarted && characterVoice.ended && !voiceError) {
+        grassStatus.textContent = '';
+        encounterStartTime = null;
+      }
+
+      return Math.max(0, 1 - elapsed / 1.5);
+    };
+
     return {
       scene: roomScene,
       minX: roomBounds.min.x + 0.25,
       maxX: roomBounds.max.x - 0.25,
       minZ: roomBounds.min.z + 0.25,
-      maxZ: roomBounds.max.z - 0.25
+      maxZ: roomBounds.max.z - 0.25,
+      beginEncounter,
+      updateEncounter
     };
   };
 
@@ -518,6 +631,11 @@ function renderGrass(time) {
   }
 
   grassScene.camera.rotation.set(cameraPitch, cameraYaw, 0, 'YXZ');
+  if (grassScene.livingRoom) {
+    const grabIntensity = grassScene.livingRoom.updateEncounter(time);
+    grassScene.camera.rotation.x += Math.sin(time * 0.035) * grabIntensity * 0.012;
+    grassScene.camera.rotation.y += Math.sin(time * 0.027) * grabIntensity * 0.01;
+  }
   grassScene.windUniforms.time.value = time * 0.001;
   if (!grassScene.livingRoom && !enteringLivingRoom) {
     grassScene.camera.updateMatrixWorld();
@@ -543,8 +661,8 @@ function renderGrass(time) {
             .then((livingRoom) => {
               grassScene.livingRoom = livingRoom;
               setSeatedLivingRoomView();
+              livingRoom.beginEncounter();
               grassControls.textContent = 'Drag to look around the living room from the couch';
-              grassStatus.textContent = '';
             })
             .catch((error) => {
               const message = error instanceof Error ? error.message : String(error);
@@ -581,6 +699,7 @@ function startGrassScene() {
 }
 
 playButton.addEventListener('click', async () => {
+  unlockCharacterVoice();
   menu.hidden = true;
   grassGame.hidden = false;
   movementKeys.clear();
@@ -590,6 +709,7 @@ playButton.addEventListener('click', async () => {
   if (grassScene) {
     if (grassScene.livingRoom) {
       setSeatedLivingRoomView();
+      grassScene.livingRoom.beginEncounter();
       grassControls.textContent = 'Drag to look around the living room from the couch';
     } else {
       cameraYaw = grassScene.spawnYaw;
@@ -626,6 +746,7 @@ playButton.addEventListener('click', async () => {
 backButton.addEventListener('click', () => {
   grassGame.hidden = true;
   menu.hidden = false;
+  stopCharacterVoice();
   movementKeys.clear();
   lampGazeSeconds = 0;
   livingRoomLoadFailed = false;
