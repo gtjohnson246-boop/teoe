@@ -325,27 +325,39 @@ async function createGrassScene() {
       const approach = Math.max(0, Math.min(1, elapsed / 1.3));
       const reach = Math.max(0, Math.min(1, (elapsed - 0.2) / 1.05));
       const smoothReach = reach * reach * (3 - 2 * reach);
+      const handReach = 0.28 + smoothReach * 0.78;
       character.root.position.z = encounterStartZ + approach * encounterApproachDistance;
       character.root.position.y = Math.sin(elapsed * 2.8) * 0.018 * approach;
-      character.torso.rotation.x = -0.07 * approach;
-      character.leftShoulder.rotation.x = -1.35 * smoothReach;
-      character.rightShoulder.rotation.x = -1.35 * smoothReach;
-      character.leftShoulder.rotation.z = -0.08 * smoothReach;
-      character.rightShoulder.rotation.z = 0.08 * smoothReach;
-      character.leftElbow.rotation.x = 0.15 * smoothReach;
-      character.rightElbow.rotation.x = 0.15 * smoothReach;
-      character.leftHand.rotation.x = -0.25 * smoothReach;
-      character.rightHand.rotation.x = -0.25 * smoothReach;
-      character.leftHand.rotation.z = -0.18 * smoothReach;
-      character.rightHand.rotation.z = 0.18 * smoothReach;
+      character.root.rotation.y = -0.18 + Math.sin(elapsed * 1.8) * 0.08;
+      character.torso.rotation.x = -0.08 * approach;
+      character.leftShoulder.rotation.x = -1.5 * smoothReach;
+      character.rightShoulder.rotation.x = -1.5 * smoothReach;
+      character.leftShoulder.rotation.z = -0.32 * smoothReach;
+      character.rightShoulder.rotation.z = 0.32 * smoothReach;
+      character.leftElbow.rotation.x = 0.95 * smoothReach;
+      character.rightElbow.rotation.x = 0.95 * smoothReach;
+      character.leftElbow.rotation.z = -0.4 * smoothReach;
+      character.rightElbow.rotation.z = 0.4 * smoothReach;
+      character.leftHand.position.z = 0.12 + handReach * 0.65;
+      character.rightHand.position.z = 0.12 + handReach * 0.65;
+      character.leftHand.rotation.x = -1.2 * smoothReach + 0.35;
+      character.rightHand.rotation.x = -1.2 * smoothReach + 0.35;
+      character.leftHand.rotation.z = -0.9 * smoothReach;
+      character.rightHand.rotation.z = 0.9 * smoothReach;
+      character.leftHand.rotation.y = 0.48 * smoothReach;
+      character.rightHand.rotation.y = -0.48 * smoothReach;
       for (const [index, finger] of character.leftFingers.entries()) {
-        finger.rotation.x = -0.9 * smoothReach;
-        character.rightFingers[index].rotation.x = -0.9 * smoothReach;
+        finger.rotation.x = -1.2 * smoothReach;
+        finger.rotation.z = (index - 1.5) * 0.06 * smoothReach;
+        character.rightFingers[index].rotation.x = -1.2 * smoothReach;
+        character.rightFingers[index].rotation.z = -(index - 1.5) * 0.06 * smoothReach;
       }
-      character.leftThumb.rotation.x = -0.55 * smoothReach;
-      character.rightThumb.rotation.x = -0.55 * smoothReach;
-      character.leftThumb.rotation.z = -0.45 * smoothReach;
-      character.rightThumb.rotation.z = 0.45 * smoothReach;
+      character.leftThumb.rotation.x = -0.9 * smoothReach;
+      character.rightThumb.rotation.x = -0.9 * smoothReach;
+      character.leftThumb.rotation.z = -0.85 * smoothReach;
+      character.rightThumb.rotation.z = 0.85 * smoothReach;
+      character.leftThumb.rotation.y = 0.22 * smoothReach;
+      character.rightThumb.rotation.y = -0.22 * smoothReach;
 
       const impact = Math.max(0, 1 - Math.abs(elapsed - 1.15) / 0.42);
 

@@ -167,9 +167,55 @@ export async function createCasualMale() {
     model.position.set(-modelCenter.x, -modelBounds.min.y, -modelCenter.z);
     root.add(model);
 
+    const pelvis = new Group();
+    pelvis.position.set(0, 0.82, 0);
+    root.add(pelvis);
+
     const torso = new Group();
     torso.position.set(0, 0.98, 0);
     root.add(torso);
+
+    const torsoCore = new Mesh(
+      new CapsuleGeometry(0.23, 0.52, 8, 16),
+      new MeshStandardMaterial({ color: 0x3f4f5d, roughness: 0.78 })
+    );
+    torsoCore.position.set(0, 0.06, 0);
+    torsoCore.castShadow = true;
+    torsoCore.receiveShadow = true;
+    torso.add(torsoCore);
+
+    const shirtTrim = new Mesh(
+      new BoxGeometry(0.18, 0.18, 0.22),
+      new MeshStandardMaterial({ color: 0x253540, roughness: 0.82 })
+    );
+    shirtTrim.position.set(0, 0.24, 0.03);
+    shirtTrim.castShadow = true;
+    shirtTrim.receiveShadow = true;
+    torso.add(shirtTrim);
+
+    for (const side of [-1, 1]) {
+      const leg = new Group();
+      leg.position.set(side * 0.12, -0.1, 0);
+      root.add(leg);
+
+      const thigh = new Mesh(
+        new CapsuleGeometry(0.11, 0.48, 6, 12),
+        new MeshStandardMaterial({ color: 0x2a2c31, roughness: 0.9 })
+      );
+      thigh.position.set(0, -0.28, 0);
+      thigh.castShadow = true;
+      thigh.receiveShadow = true;
+      leg.add(thigh);
+
+      const shoe = new Mesh(
+        new BoxGeometry(0.18, 0.1, 0.3),
+        new MeshStandardMaterial({ color: 0x171719, roughness: 0.86 })
+      );
+      shoe.position.set(0, -0.6, 0.05);
+      shoe.castShadow = true;
+      shoe.receiveShadow = true;
+      leg.add(shoe);
+    }
 
     const head = new Group();
     head.position.set(0, 1.68, 0);
