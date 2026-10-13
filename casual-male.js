@@ -178,16 +178,17 @@ export async function createCasualMale() {
     const root = new Group();
     root.name = 'freddie';
 
+    model.scale.setScalar(0.042);
+    model.rotation.set(0.08, Math.PI, 0);
+    model.position.set(0, 0, 0);
+    model.updateMatrixWorld(true);
+    const transformedBounds = new Box3().setFromObject(model);
+    const modelCenter = transformedBounds.getCenter(new Vector3());
+
     const head = new Group();
     head.position.set(0, 1.68, 0);
     root.add(head);
-
-    model.scale.setScalar(0.042);
-    model.rotation.set(0.08, Math.PI, 0);
-    const modelCenter = modelBounds.getCenter(new Vector3());
-    model.position.set(-modelCenter.x, -modelBounds.min.y + 0.1, -modelCenter.z + 0.18);
-    head.position.set(0, 1.78, 0.08);
-    head.rotation.y = Math.PI;
+    model.position.set(-modelCenter.x, -transformedBounds.min.y, -modelCenter.z);
     head.add(model);
 
     const pelvis = new Group();

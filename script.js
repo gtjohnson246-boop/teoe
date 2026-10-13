@@ -117,7 +117,7 @@ async function createGrassScene() {
   ] = await Promise.all([
     import('three'),
     import('three/addons/loaders/GLTFLoader.js'),
-    import('./casual-male.js?v=freddie-model-4')
+    import('./casual-male.js?v=freddie-model-5')
   ]);
 
   const random = () => Math.random();
