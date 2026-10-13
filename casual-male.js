@@ -179,7 +179,7 @@ export async function createCasualMale() {
     root.name = 'freddie';
 
     model.scale.setScalar(0.042);
-    model.rotation.set(0.08, Math.PI, 0);
+    model.rotation.set(0.08, 0, 0);
     model.position.set(0, 0, 0);
     model.updateMatrixWorld(true);
     const transformedBounds = new Box3().setFromObject(model);
