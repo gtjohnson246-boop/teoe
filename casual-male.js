@@ -160,7 +160,6 @@ export async function createCasualMale() {
     const model = gltf.scene;
     model.name = 'freddie model';
     model.scale.setScalar(0.15);
-    model.rotation.y = Math.PI;
     model.updateMatrixWorld(true);
     const modelBounds = new Box3().setFromObject(model);
     const modelCenter = modelBounds.getCenter(new Vector3());

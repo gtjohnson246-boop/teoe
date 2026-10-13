@@ -117,7 +117,7 @@ async function createGrassScene() {
   ] = await Promise.all([
     import('three'),
     import('three/addons/loaders/GLTFLoader.js'),
-    import('./casual-male.js?v=freddie-model-1')
+    import('./casual-male.js?v=freddie-model-2')
   ]);
 
   const random = () => Math.random();
@@ -259,6 +259,8 @@ async function createGrassScene() {
   scene.add(lampLight);
   const gazeRaycaster = new Raycaster();
   const screenCenter = new Vector2(0, 0);
+  const encounterStartZ = -2.15;
+  const encounterApproachDistance = 1.35;
 
   let livingRoomPromise = null;
   const buildLivingRoom = async () => {
@@ -301,7 +303,7 @@ async function createGrassScene() {
     roomScene.add(couch);
 
     const character = await createCasualMale();
-    character.root.position.set(0, 0, -0.75);
+    character.root.position.set(0, 0, encounterStartZ);
     roomScene.add(character.root);
 
     let encounterStartTime = null;
@@ -312,7 +314,7 @@ async function createGrassScene() {
       encounterStartTime = performance.now();
       voiceStarted = false;
       voiceError = false;
-      character.root.position.set(0, 0, -0.65);
+      character.root.position.set(0, 0, encounterStartZ);
       grassStatus.textContent = 'He grabs you...';
       grassStatus.removeAttribute('data-error');
     };
@@ -323,7 +325,7 @@ async function createGrassScene() {
       const approach = Math.max(0, Math.min(1, elapsed / 1.3));
       const reach = Math.max(0, Math.min(1, (elapsed - 0.2) / 1.05));
       const smoothReach = reach * reach * (3 - 2 * reach);
-      character.root.position.z = -0.65 + approach * 1.35;
+      character.root.position.z = encounterStartZ + approach * encounterApproachDistance;
       character.root.position.y = Math.sin(elapsed * 2.8) * 0.018 * approach;
       character.torso.rotation.x = -0.07 * approach;
       character.leftShoulder.rotation.x = -1.35 * smoothReach;
