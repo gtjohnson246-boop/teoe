@@ -7,7 +7,7 @@ import {
   SphereGeometry
 } from 'three';
 
-export function createCasualMale() {
+function createProceduralCasualMale() {
   const root = new Group();
   root.name = 'casual male';
 
@@ -146,3 +146,106 @@ export function createCasualMale() {
     rightThumb: rightArm.thumb
   };
 }
+
+export async function createCasualMale() {
+  try {
+    const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+    const loader = new GLTFLoader();
+    const gltf = await loader.loadAsync(new URL('./freddie_single_camera_speedscan_gltf/scene.gltf', import.meta.url).href);
+    const root = new Group();
+    root.name = 'freddie';
+
+    const model = gltf.scene;
+    model.name = 'freddie model';
+    model.scale.setScalar(0.15);
+    model.rotation.y = Math.PI;
+    model.position.set(0, 0.1, 0);
+    root.add(model);
+
+    const torso = new Group();
+    torso.position.set(0, 0.98, 0);
+    root.add(torso);
+
+    const head = new Group();
+    head.position.set(0, 1.68, 0);
+    root.add(head);
+
+    const mouth = new Group();
+    mouth.name = 'mouth';
+    mouth.position.set(0, -0.09, 0.13);
+    mouth.scale.y = 0.35;
+    head.add(mouth);
+
+    const jaw = new Group();
+    jaw.name = 'jaw';
+    jaw.position.set(0, -0.13, 0.12);
+    head.add(jaw);
+
+    const leftShoulder = new Group();
+    leftShoulder.position.set(-0.22, 1.25, 0);
+    root.add(leftShoulder);
+
+    const rightShoulder = new Group();
+    rightShoulder.position.set(0.22, 1.25, 0);
+    root.add(rightShoulder);
+
+    const leftElbow = new Group();
+    leftElbow.position.set(0, -0.28, 0);
+    leftShoulder.add(leftElbow);
+
+    const rightElbow = new Group();
+    rightElbow.position.set(0, -0.28, 0);
+    rightShoulder.add(rightElbow);
+
+    const leftHand = new Group();
+    leftHand.position.set(0, -0.34, 0);
+    leftElbow.add(leftHand);
+
+    const rightHand = new Group();
+    rightHand.position.set(0, -0.34, 0);
+    rightElbow.add(rightHand);
+
+    const leftFingers = Array.from({ length: 4 }, (_, index) => {
+      const finger = new Group();
+      finger.position.set((index - 1.5) * 0.035, -0.04, 0.02);
+      leftHand.add(finger);
+      return finger;
+    });
+    const rightFingers = Array.from({ length: 4 }, (_, index) => {
+      const finger = new Group();
+      finger.position.set((index - 1.5) * 0.035, -0.04, 0.02);
+      rightHand.add(finger);
+      return finger;
+    });
+
+    const leftThumb = new Group();
+    leftThumb.position.set(-0.07, -0.01, 0.02);
+    leftHand.add(leftThumb);
+
+    const rightThumb = new Group();
+    rightThumb.position.set(0.07, -0.01, 0.02);
+    rightHand.add(rightThumb);
+
+    return {
+      root,
+      torso,
+      head,
+      mouth,
+      jaw,
+      leftShoulder,
+      rightShoulder,
+      leftElbow,
+      rightElbow,
+      leftHand,
+      rightHand,
+      leftFingers,
+      rightFingers,
+      leftThumb,
+      rightThumb
+    };
+  } catch (error) {
+    console.warn('Failed to load Freddie model; falling back to the original procedural character.', error);
+    return createProceduralCasualMale();
+  }
+}
+

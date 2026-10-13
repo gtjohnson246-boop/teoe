@@ -300,7 +300,7 @@ async function createGrassScene() {
     );
     roomScene.add(couch);
 
-    const character = createCasualMale();
+    const character = await createCasualMale();
     character.root.position.set(0, 0, -0.75);
     roomScene.add(character.root);
 
