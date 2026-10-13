@@ -8,6 +8,9 @@ const grassControls = document.getElementById('grass-controls');
 const backButton = document.getElementById('back-button');
 const characterVoice = new Audio('audio/casual-male-voice.mp3');
 characterVoice.preload = 'auto';
+const grabSound = new Audio('audio/grab-sound.mp3');
+grabSound.preload = 'auto';
+grabSound.volume = 0.9;
 
 let introFinished = false;
 let grassScene = null;
@@ -63,9 +66,21 @@ async function playCharacterVoice() {
   await characterVoice.play();
 }
 
+function playGrabSound() {
+  grabSound.currentTime = 0;
+  return grabSound.play().catch((error) => {
+    console.error('Could not play the grab sound:', error);
+  });
+}
+
 function stopCharacterVoice() {
   characterVoice.pause();
   characterVoice.currentTime = 0;
+}
+
+function resetGrabSound() {
+  grabSound.pause();
+  grabSound.currentTime = 0;
 }
 
 function finishIntro() {
@@ -317,11 +332,14 @@ async function createGrassScene() {
     let encounterStartTime = null;
     let voiceStarted = false;
     let voiceError = false;
+    let grabSoundPlayed = false;
     const beginEncounter = () => {
       stopCharacterVoice();
+      resetGrabSound();
       encounterStartTime = performance.now();
       voiceStarted = false;
       voiceError = false;
+      grabSoundPlayed = false;
       character.root.position.set(0, 0, encounterStartZ);
       grassStatus.textContent = 'He grabs you...';
       grassStatus.removeAttribute('data-error');
@@ -371,6 +389,10 @@ async function createGrassScene() {
 
       if (!voiceStarted && elapsed >= 1.15) {
         voiceStarted = true;
+        if (!grabSoundPlayed) {
+          grabSoundPlayed = true;
+          void playGrabSound();
+        }
         grassStatus.textContent = 'The man is speaking...';
         void playCharacterVoice().catch((error) => {
           console.error('Could not play the character voice:', error);
