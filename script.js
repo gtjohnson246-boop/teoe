@@ -260,7 +260,8 @@ async function createGrassScene() {
   const gazeRaycaster = new Raycaster();
   const screenCenter = new Vector2(0, 0);
 
-  const loadLivingRoom = async () => {
+  let livingRoomPromise = null;
+  const buildLivingRoom = async () => {
     const [roomGltf, couchGltf] = await Promise.all([
       loadModel('living-room/scene.gltf'),
       loadModel('couch/scene.gltf')
@@ -302,6 +303,12 @@ async function createGrassScene() {
     const character = createCasualMale();
     character.root.position.set(0, 0, -0.75);
     roomScene.add(character.root);
+
+    const roomCamera = new PerspectiveCamera(72, 1, 0.1, 140);
+    roomCamera.position.set(0, 0.82, 1.6);
+    roomCamera.rotation.order = 'YXZ';
+    roomCamera.lookAt(0, 0.7, -1);
+    await renderer.compileAsync(roomScene, roomCamera);
 
     let encounterStartTime = null;
     let voiceStarted = false;
@@ -396,6 +403,15 @@ async function createGrassScene() {
       },
       updateEncounter
     };
+  };
+  const loadLivingRoom = () => {
+    if (!livingRoomPromise) {
+      livingRoomPromise = buildLivingRoom().catch((error) => {
+        livingRoomPromise = null;
+        throw error;
+      });
+    }
+    return livingRoomPromise;
   };
 
   const variantSources = variants.map((variant) => {
@@ -588,7 +604,9 @@ async function createGrassScene() {
     gazeRaycaster,
     screenCenter,
     loadLivingRoom,
+    preloadLivingRoom: loadLivingRoom,
     livingRoom: null,
+    livingRoomPreloadStarted: false,
     spawnYaw,
     spawnPitch
   };
@@ -673,6 +691,13 @@ function renderGrass(time) {
       .length > 0;
 
     if (isLookingAtLamp) {
+      if (!grassScene.livingRoomPreloadStarted) {
+        grassScene.livingRoomPreloadStarted = true;
+        void grassScene.preloadLivingRoom().catch((error) => {
+          console.error('Could not preload the living room and couch:', error);
+        });
+      }
+
       if (!livingRoomLoadFailed) {
         lampGazeSeconds += delta;
         const countdown = Math.ceil(3 - lampGazeSeconds);
