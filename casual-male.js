@@ -157,15 +157,19 @@ export async function createCasualMale() {
     const root = new Group();
     root.name = 'freddie';
 
+    const head = new Group();
+    head.position.set(0, 1.68, 0);
+    root.add(head);
+
     const model = gltf.scene;
     model.name = 'freddie model';
-    model.scale.setScalar(0.15);
+    model.scale.setScalar(0.035);
     model.rotation.x = Math.PI / 2;
     model.updateMatrixWorld(true);
     const modelBounds = new Box3().setFromObject(model);
     const modelCenter = modelBounds.getCenter(new Vector3());
-    model.position.set(-modelCenter.x, -modelBounds.min.y, -modelCenter.z);
-    root.add(model);
+    model.position.set(-modelCenter.x, -modelCenter.y, -modelCenter.z);
+    head.add(model);
 
     const pelvis = new Group();
     pelvis.position.set(0, 0.82, 0);
@@ -175,9 +179,10 @@ export async function createCasualMale() {
     torso.position.set(0, 0.98, 0);
     root.add(torso);
 
+    const shirtMaterial = new MeshStandardMaterial({ color: 0x3f4f5d, roughness: 0.78 });
     const torsoCore = new Mesh(
       new CapsuleGeometry(0.23, 0.52, 8, 16),
-      new MeshStandardMaterial({ color: 0x3f4f5d, roughness: 0.78 })
+      shirtMaterial
     );
     torsoCore.position.set(0, 0.06, 0);
     torsoCore.castShadow = true;
@@ -192,6 +197,15 @@ export async function createCasualMale() {
     shirtTrim.castShadow = true;
     shirtTrim.receiveShadow = true;
     torso.add(shirtTrim);
+
+    const neck = new Mesh(
+      new CapsuleGeometry(0.085, 0.12, 6, 12),
+      new MeshStandardMaterial({ color: 0xb98569, roughness: 0.76 })
+    );
+    neck.position.set(0, 1.54, 0);
+    neck.castShadow = true;
+    neck.receiveShadow = true;
+    root.add(neck);
 
     for (const side of [-1, 1]) {
       const leg = new Group();
@@ -217,10 +231,6 @@ export async function createCasualMale() {
       leg.add(shoe);
     }
 
-    const head = new Group();
-    head.position.set(0, 1.68, 0);
-    root.add(head);
-
     const mouth = new Group();
     mouth.name = 'mouth';
     mouth.position.set(0, -0.09, 0.13);
@@ -240,6 +250,18 @@ export async function createCasualMale() {
     rightShoulder.position.set(0.22, 1.25, 0);
     root.add(rightShoulder);
 
+    const skinMaterial = new MeshStandardMaterial({ color: 0xb98569, roughness: 0.76 });
+    const addLimb = (parent, radius, length, material, y) => {
+      const limb = new Mesh(new CapsuleGeometry(radius, length, 6, 12), material);
+      limb.position.set(0, y, 0);
+      limb.castShadow = true;
+      limb.receiveShadow = true;
+      parent.add(limb);
+    };
+    for (const shoulder of [leftShoulder, rightShoulder]) {
+      addLimb(shoulder, 0.105, 0.25, shirtMaterial, -0.18);
+    }
+
     const leftElbow = new Group();
     leftElbow.position.set(0, -0.28, 0);
     leftShoulder.add(leftElbow);
@@ -247,6 +269,10 @@ export async function createCasualMale() {
     const rightElbow = new Group();
     rightElbow.position.set(0, -0.28, 0);
     rightShoulder.add(rightElbow);
+
+    for (const elbow of [leftElbow, rightElbow]) {
+      addLimb(elbow, 0.073, 0.27, skinMaterial, -0.17);
+    }
 
     const leftHand = new Group();
     leftHand.position.set(0, -0.34, 0);
@@ -256,26 +282,39 @@ export async function createCasualMale() {
     rightHand.position.set(0, -0.34, 0);
     rightElbow.add(rightHand);
 
+    for (const hand of [leftHand, rightHand]) {
+      const palm = new Mesh(new SphereGeometry(1, 16, 12), skinMaterial);
+      palm.position.set(0, -0.012, 0);
+      palm.scale.set(0.075, 0.095, 0.052);
+      palm.castShadow = true;
+      palm.receiveShadow = true;
+      hand.add(palm);
+    }
+
     const leftFingers = Array.from({ length: 4 }, (_, index) => {
       const finger = new Group();
       finger.position.set((index - 1.5) * 0.035, -0.04, 0.02);
       leftHand.add(finger);
+      addLimb(finger, 0.014, 0.055, skinMaterial, -0.04);
       return finger;
     });
     const rightFingers = Array.from({ length: 4 }, (_, index) => {
       const finger = new Group();
       finger.position.set((index - 1.5) * 0.035, -0.04, 0.02);
       rightHand.add(finger);
+      addLimb(finger, 0.014, 0.055, skinMaterial, -0.04);
       return finger;
     });
 
     const leftThumb = new Group();
     leftThumb.position.set(-0.07, -0.01, 0.02);
     leftHand.add(leftThumb);
+    addLimb(leftThumb, 0.018, 0.065, skinMaterial, -0.033);
 
     const rightThumb = new Group();
     rightThumb.position.set(0.07, -0.01, 0.02);
     rightHand.add(rightThumb);
+    addLimb(rightThumb, 0.018, 0.065, skinMaterial, -0.033);
 
     return {
       root,
