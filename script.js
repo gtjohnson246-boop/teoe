@@ -276,6 +276,14 @@ async function createGrassScene() {
     roomLight.position.set(-3, 7, 4);
     roomScene.add(roomLight);
 
+    const faceLight = new PointLight(0xffd9a3, 1.6, 10, 2);
+    faceLight.position.set(0, 2.0, 1.8);
+    roomScene.add(faceLight);
+
+    const fillLight = new PointLight(0xbfd1ff, 0.45, 12, 2);
+    fillLight.position.set(-2.8, 1.8, 0.6);
+    roomScene.add(fillLight);
+
     const room = roomGltf.scene;
     room.updateMatrixWorld(true);
     const sourceRoomBounds = new Box3().setFromObject(room);

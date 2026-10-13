@@ -182,10 +182,12 @@ export async function createCasualMale() {
     head.position.set(0, 1.68, 0);
     root.add(head);
 
-    model.scale.setScalar(0.035);
-    model.rotation.x = 0;
+    model.scale.setScalar(0.042);
+    model.rotation.set(0.08, Math.PI, 0);
     const modelCenter = modelBounds.getCenter(new Vector3());
-    model.position.set(-modelCenter.x, -modelCenter.y, -modelCenter.z);
+    model.position.set(-modelCenter.x, -modelCenter.y - 0.15, -modelCenter.z + 0.22);
+    head.position.set(0, 1.82, 0.08);
+    head.rotation.y = Math.PI;
     head.add(model);
 
     const pelvis = new Group();
