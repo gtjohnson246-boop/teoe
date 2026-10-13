@@ -183,6 +183,7 @@ async function createGrassScene() {
       RepeatWrapping,
       Scene,
       SRGBColorSpace,
+      SphereGeometry,
       Vector2,
       Vector3,
       WebGLRenderer
