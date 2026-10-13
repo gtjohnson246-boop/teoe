@@ -311,24 +311,40 @@ async function createGrassScene() {
       encounterStartTime = performance.now();
       voiceStarted = false;
       voiceError = false;
-      grassStatus.textContent = 'A man reaches out and grabs you...';
+      character.root.position.set(0, 0, -0.65);
+      grassStatus.textContent = 'He grabs you...';
       grassStatus.removeAttribute('data-error');
     };
     const updateEncounter = (time) => {
       if (encounterStartTime === null) return 0;
 
       const elapsed = Math.max(0, (time - encounterStartTime) / 1000);
-      const approach = Math.max(0, Math.min(1, elapsed / 1.2));
-      const reach = Math.max(0, Math.min(1, (elapsed - 0.15) / 0.9));
+      const approach = Math.max(0, Math.min(1, elapsed / 1.3));
+      const reach = Math.max(0, Math.min(1, (elapsed - 0.2) / 1.05));
       const smoothReach = reach * reach * (3 - 2 * reach);
-      character.root.position.z = -0.75 + approach * 0.95;
-      character.root.position.y = Math.sin(elapsed * 4) * 0.012 * approach;
-      character.leftShoulder.rotation.x = -1.25 * smoothReach;
-      character.rightShoulder.rotation.x = -1.25 * smoothReach;
-      character.leftElbow.rotation.x = -0.65 * smoothReach;
-      character.rightElbow.rotation.x = -0.65 * smoothReach;
-      character.leftHand.rotation.x = -0.2 * smoothReach;
-      character.rightHand.rotation.x = -0.2 * smoothReach;
+      character.root.position.z = -0.65 + approach * 1.35;
+      character.root.position.y = Math.sin(elapsed * 2.8) * 0.018 * approach;
+      character.torso.rotation.x = -0.07 * approach;
+      character.leftShoulder.rotation.x = -1.35 * smoothReach;
+      character.rightShoulder.rotation.x = -1.35 * smoothReach;
+      character.leftShoulder.rotation.z = -0.08 * smoothReach;
+      character.rightShoulder.rotation.z = 0.08 * smoothReach;
+      character.leftElbow.rotation.x = 0.15 * smoothReach;
+      character.rightElbow.rotation.x = 0.15 * smoothReach;
+      character.leftHand.rotation.x = -0.25 * smoothReach;
+      character.rightHand.rotation.x = -0.25 * smoothReach;
+      character.leftHand.rotation.z = -0.18 * smoothReach;
+      character.rightHand.rotation.z = 0.18 * smoothReach;
+      for (const [index, finger] of character.leftFingers.entries()) {
+        finger.rotation.x = -0.9 * smoothReach;
+        character.rightFingers[index].rotation.x = -0.9 * smoothReach;
+      }
+      character.leftThumb.rotation.x = -0.55 * smoothReach;
+      character.rightThumb.rotation.x = -0.55 * smoothReach;
+      character.leftThumb.rotation.z = -0.45 * smoothReach;
+      character.rightThumb.rotation.z = 0.45 * smoothReach;
+
+      const impact = Math.max(0, 1 - Math.abs(elapsed - 1.15) / 0.42);
 
       if (!voiceStarted && elapsed >= 1.15) {
         voiceStarted = true;
@@ -351,17 +367,21 @@ async function createGrassScene() {
         }
         mouthOpening = Math.min(1, Math.max(0, (Math.sqrt(amplitude / voiceWaveform.length) - 0.015) * 8));
       } else if (voiceStarted && !characterVoice.paused) {
-        mouthOpening = 0.15 + Math.abs(Math.sin(time * 0.018)) * 0.3;
+        mouthOpening = 0.12 + Math.abs(Math.sin(time * 0.024)) * 0.48;
       }
-      character.mouth.scale.y = 0.35 + mouthOpening * 2.1;
-      character.head.rotation.x = Math.sin(time * 0.003) * mouthOpening * 0.08;
+      character.mouth.scale.y = 0.35 + mouthOpening * 2.8;
+      character.jaw.rotation.x = -mouthOpening * 0.34;
+      character.head.rotation.x = Math.sin(time * 0.003) * mouthOpening * 0.08 - mouthOpening * 0.08;
+      character.head.rotation.y = Math.sin(time * 0.0018) * 0.035;
 
       if (voiceStarted && characterVoice.ended && !voiceError) {
         grassStatus.textContent = '';
+        character.mouth.scale.y = 0.35;
+        character.jaw.rotation.x = 0;
         encounterStartTime = null;
       }
 
-      return Math.max(0, 1 - elapsed / 1.5);
+      return Math.max(impact, voiceStarted && !characterVoice.ended ? 0.18 : 0);
     };
 
     return {
@@ -371,6 +391,9 @@ async function createGrassScene() {
       minZ: roomBounds.min.z + 0.25,
       maxZ: roomBounds.max.z - 0.25,
       beginEncounter,
+      get characterPositionZ() {
+        return character.root.position.z;
+      },
       updateEncounter
     };
   };
@@ -632,9 +655,14 @@ function renderGrass(time) {
 
   grassScene.camera.rotation.set(cameraPitch, cameraYaw, 0, 'YXZ');
   if (grassScene.livingRoom) {
+    const approach = Math.max(0, Math.min(1, (grassScene.livingRoom.characterPositionZ + 0.65) / 1.35));
     const grabIntensity = grassScene.livingRoom.updateEncounter(time);
-    grassScene.camera.rotation.x += Math.sin(time * 0.035) * grabIntensity * 0.012;
-    grassScene.camera.rotation.y += Math.sin(time * 0.027) * grabIntensity * 0.01;
+    grassScene.camera.rotation.x += approach * 0.4;
+    grassScene.camera.position.x += Math.sin(time * 0.035) * grabIntensity * 0.045;
+    grassScene.camera.position.y += (Math.sin(time * 0.027) - 0.5) * grabIntensity * 0.06;
+    grassScene.camera.position.z += (Math.cos(time * 0.031) - 1) * grabIntensity * 0.07;
+    grassScene.camera.rotation.x += Math.sin(time * 0.035) * grabIntensity * 0.045;
+    grassScene.camera.rotation.y += Math.sin(time * 0.027) * grabIntensity * 0.035;
   }
   grassScene.windUniforms.time.value = time * 0.001;
   if (!grassScene.livingRoom && !enteringLivingRoom) {
