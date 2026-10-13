@@ -304,12 +304,6 @@ async function createGrassScene() {
     character.root.position.set(0, 0, -0.75);
     roomScene.add(character.root);
 
-    const roomCamera = new PerspectiveCamera(72, 1, 0.1, 140);
-    roomCamera.position.set(0, 0.82, 1.6);
-    roomCamera.rotation.order = 'YXZ';
-    roomCamera.lookAt(0, 0.7, -1);
-    await renderer.compileAsync(roomScene, roomCamera);
-
     let encounterStartTime = null;
     let voiceStarted = false;
     let voiceError = false;
