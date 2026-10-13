@@ -4,6 +4,7 @@ import {
   CapsuleGeometry,
   Group,
   Mesh,
+  MeshPhysicalMaterial,
   MeshStandardMaterial,
   SphereGeometry,
   Vector3
@@ -13,19 +14,18 @@ function createProceduralCasualMale() {
   const root = new Group();
   root.name = 'casual male';
 
-  const shirt = new MeshStandardMaterial({ color: 0x394d5c, roughness: 0.8 });
-  const shirtTrim = new MeshStandardMaterial({ color: 0x243541, roughness: 0.82 });
-  const pants = new MeshStandardMaterial({ color: 0x292b31, roughness: 0.91 });
-  const skin = new MeshStandardMaterial({ color: 0xb98569, roughness: 0.76 });
-  const lip = new MeshStandardMaterial({ color: 0x89584f, roughness: 0.72 });
-  const hair = new MeshStandardMaterial({ color: 0x27211e, roughness: 0.94 });
+  const shirt = new MeshPhysicalMaterial({ color: 0x40566a, roughness: 0.78, metalness: 0.06, clearcoat: 0.08, clearcoatRoughness: 0.9 });
+  const shirtTrim = new MeshStandardMaterial({ color: 0x213844, roughness: 0.82 });
+  const pants = new MeshStandardMaterial({ color: 0x2a2d31, roughness: 0.9 });
+  const skin = new MeshPhysicalMaterial({ color: 0xbf8a68, roughness: 0.7, clearcoat: 0.06, clearcoatRoughness: 0.9 });
+  const lip = new MeshStandardMaterial({ color: 0x824a45, roughness: 0.6 });
+  const hair = new MeshStandardMaterial({ color: 0x1f1a18, roughness: 0.94 });
   const shoes = new MeshStandardMaterial({ color: 0x171719, roughness: 0.86 });
-  const dark = new MeshStandardMaterial({ color: 0x241819, roughness: 0.9 });
-  const eyeWhite = new MeshStandardMaterial({ color: 0xd9d1c4, roughness: 0.62 });
-  const iris = new MeshStandardMaterial({ color: 0x554335, roughness: 0.58 });
-  const teeth = new MeshStandardMaterial({ color: 0xe4d9c4, roughness: 0.55 });
-  const tongue = new MeshStandardMaterial({ color: 0x95525a, roughness: 0.76 });
-  const button = new MeshStandardMaterial({ color: 0xa39377, roughness: 0.45, metalness: 0.12 });
+  const dark = new MeshStandardMaterial({ color: 0x1f1719, roughness: 0.96 });
+  const eyeWhite = new MeshPhysicalMaterial({ color: 0xdfd9ca, roughness: 0.65, clearcoat: 0.05 });
+  const iris = new MeshStandardMaterial({ color: 0x47372b, roughness: 0.52 });
+  const teeth = new MeshPhysicalMaterial({ color: 0xe4d9c4, roughness: 0.4, clearcoat: 0.12 });
+  const tongue = new MeshStandardMaterial({ color: 0xa14f5d, roughness: 0.7 });
 
   const addCapsule = (parent, radius, length, material, position) => {
     const mesh = new Mesh(new CapsuleGeometry(radius, length, 6, 12), material);
@@ -35,7 +35,7 @@ function createProceduralCasualMale() {
     parent.add(mesh);
     return mesh;
   };
-  const addSphere = (parent, material, position, scale, geometry = new SphereGeometry(1, 20, 16)) => {
+  const addSphere = (parent, material, position, scale, geometry = new SphereGeometry(1, 26, 18)) => {
     const mesh = new Mesh(geometry, material);
     mesh.position.set(...position);
     mesh.scale.set(...scale);
@@ -46,83 +46,98 @@ function createProceduralCasualMale() {
   };
 
   const torso = new Group();
-  torso.position.set(0, 1.05, 0);
+  torso.position.set(0, 1.03, 0);
   root.add(torso);
-  addCapsule(torso, 0.235, 0.48, shirt, [0, 0.02, 0]);
-  addSphere(torso, shirtTrim, [0, 0.2, 0.015], [0.075, 0.27, 0.225]);
-  addCapsule(root, 0.12, 0.14, skin, [0, 1.46, 0]);
+  const torsoCore = addCapsule(torso, 0.24, 0.52, shirt, [0, 0.04, 0]);
+  torsoCore.scale.z = 1.06;
+  addSphere(torso, shirtTrim, [0, 0.2, 0.012], [0.08, 0.24, 0.21]);
+  addSphere(root, skin, [0, 1.48, 0], [0.09, 0.12, 0.09]);
 
   for (const side of [-1, 1]) {
-    addCapsule(root, 0.087, 0.68, pants, [side * 0.12, 0.43, 0]);
-    const shoe = new Mesh(new BoxGeometry(0.17, 0.1, 0.28), shoes);
-    shoe.position.set(side * 0.12, 0.07, 0.05);
+    addCapsule(root, 0.096, 0.66, pants, [side * 0.12, 0.41, 0]);
+    const shoe = new Mesh(new BoxGeometry(0.17, 0.09, 0.3), shoes);
+    shoe.position.set(side * 0.12, 0.07, 0.06);
     shoe.castShadow = true;
+    shoe.receiveShadow = true;
     root.add(shoe);
   }
 
   const head = new Group();
-  head.position.set(0, 1.65, 0);
+  head.position.set(0, 1.68, 0);
   root.add(head);
-  addSphere(head, skin, [0, 0, 0], [0.177, 0.225, 0.164]);
-  addSphere(head, hair, [0, 0.118, -0.012], [0.183, 0.115, 0.171]);
-  addSphere(head, hair, [-0.162, 0.015, 0.005], [0.034, 0.09, 0.135]);
-  addSphere(head, hair, [0.162, 0.015, 0.005], [0.034, 0.09, 0.135]);
-  addSphere(head, skin, [-0.178, -0.015, 0], [0.045, 0.07, 0.035]);
-  addSphere(head, skin, [0.178, -0.015, 0], [0.045, 0.07, 0.035]);
+  addSphere(head, skin, [0, 0, 0], [0.18, 0.224, 0.17]);
+
+  const hairCap = addSphere(head, hair, [0, 0.12, -0.015], [0.188, 0.11, 0.175]);
+  hairCap.scale.y = 1.2;
+  addSphere(head, hair, [-0.162, 0.022, 0], [0.04, 0.095, 0.12]);
+  addSphere(head, hair, [0.162, 0.022, 0], [0.04, 0.095, 0.12]);
+  addSphere(head, hair, [0, 0.15, 0.03], [0.12, 0.05, 0.12]);
 
   for (const side of [-1, 1]) {
-    addSphere(head, dark, [side * 0.07, 0.055, 0.139], [0.052, 0.026, 0.018]);
-    addSphere(head, eyeWhite, [side * 0.07, 0.05, 0.153], [0.033, 0.016, 0.01]);
-    addSphere(head, iris, [side * 0.07, 0.05, 0.162], [0.011, 0.013, 0.006]);
-    addSphere(head, dark, [side * 0.07, 0.05, 0.167], [0.005, 0.008, 0.004]);
-    const brow = addCapsule(head, 0.012, 0.065, hair, [side * 0.07, 0.093, 0.154]);
+    const ear = addSphere(head, skin, [side * 0.177, 0.01, 0], [0.022, 0.056, 0.025]);
+    ear.scale.x = 0.7;
+
+    addSphere(head, dark, [side * 0.07, 0.055, 0.137], [0.05, 0.026, 0.018]);
+    addSphere(head, eyeWhite, [side * 0.07, 0.05, 0.155], [0.034, 0.016, 0.01]);
+    addSphere(head, iris, [side * 0.07, 0.05, 0.164], [0.011, 0.013, 0.006]);
+    addSphere(head, dark, [side * 0.07, 0.05, 0.171], [0.006, 0.008, 0.004]);
+
+    const brow = addCapsule(head, 0.011, 0.06, hair, [side * 0.07, 0.096, 0.156]);
     brow.rotation.z = side * -0.08;
+    brow.rotation.y = side * 0.28;
   }
 
-  addSphere(head, skin, [0, -0.006, 0.163], [0.029, 0.045, 0.04]);
-  addSphere(head, lip, [-0.072, -0.052, 0.133], [0.038, 0.009, 0.026]);
-  addSphere(head, lip, [0.072, -0.052, 0.133], [0.038, 0.009, 0.026]);
-  addSphere(head, skin, [-0.096, -0.07, 0.118], [0.014, 0.021, 0.01]);
-  addSphere(head, skin, [0.096, -0.07, 0.118], [0.014, 0.021, 0.01]);
+  const nose = new Mesh(new CapsuleGeometry(0.014, 0.08, 6, 12), skin);
+  nose.rotation.x = Math.PI / 2;
+  nose.position.set(0, -0.022, 0.172);
+  nose.castShadow = true;
+  nose.receiveShadow = true;
+  head.add(nose);
 
-  const mouth = addSphere(head, dark, [0, -0.095, 0.147], [0.052, 0.024, 0.018]);
-  addSphere(head, teeth, [0, -0.087, 0.163], [0.036, 0.009, 0.008]);
-  addSphere(head, tongue, [0, -0.111, 0.162], [0.025, 0.007, 0.008]);
+  addSphere(head, skin, [0, -0.005, 0.166], [0.028, 0.05, 0.04]);
+  addSphere(head, lip, [-0.073, -0.062, 0.133], [0.038, 0.009, 0.024]);
+  addSphere(head, lip, [0.073, -0.062, 0.133], [0.038, 0.009, 0.024]);
+  addSphere(head, skin, [-0.098, -0.08, 0.118], [0.013, 0.02, 0.01]);
+  addSphere(head, skin, [0.098, -0.08, 0.118], [0.013, 0.02, 0.01]);
+
+  const mouth = addSphere(head, dark, [0, -0.096, 0.147], [0.055, 0.024, 0.018]);
+  addSphere(head, teeth, [0, -0.086, 0.162], [0.038, 0.009, 0.008]);
+  addSphere(head, tongue, [0, -0.112, 0.162], [0.024, 0.008, 0.008]);
   const jaw = new Group();
   jaw.position.set(0, -0.1, 0.124);
   head.add(jaw);
-  addSphere(jaw, skin, [0, -0.022, 0.006], [0.067, 0.04, 0.037]);
+  addSphere(jaw, skin, [0, -0.022, 0.006], [0.068, 0.04, 0.037]);
   addSphere(jaw, lip, [0, -0.006, 0.035], [0.047, 0.009, 0.012]);
 
   const createArm = (side) => {
     const shoulder = new Group();
     shoulder.position.set(side * 0.225, 1.27, 0);
     root.add(shoulder);
-    addCapsule(shoulder, 0.105, 0.25, shirt, [0, -0.18, 0]);
+    addCapsule(shoulder, 0.108, 0.25, shirt, [0, -0.18, 0]);
 
     const elbow = new Group();
     elbow.position.y = -0.34;
     shoulder.add(elbow);
-    addCapsule(elbow, 0.073, 0.27, skin, [0, -0.17, 0]);
-    addSphere(elbow, skin, [0, -0.33, 0], [0.071, 0.075, 0.07]);
+    addCapsule(elbow, 0.07, 0.28, skin, [0, -0.16, 0]);
+    addSphere(elbow, skin, [0, -0.33, 0], [0.071, 0.076, 0.07]);
 
     const hand = new Group();
     hand.position.y = -0.35;
     elbow.add(hand);
-    addSphere(hand, skin, [0, -0.012, 0], [0.075, 0.095, 0.052]);
+    addSphere(hand, skin, [0, -0.012, 0], [0.078, 0.096, 0.056]);
     const fingers = [];
     for (let finger = 0; finger < 4; finger += 1) {
       const digit = new Group();
       digit.position.set((finger - 1.5) * 0.035, -0.04, 0.018);
       hand.add(digit);
-      addCapsule(digit, 0.014, 0.055, skin, [0, -0.04, 0.012]);
+      addCapsule(digit, 0.013, 0.057, skin, [0, -0.04, 0.011]);
       addSphere(digit, skin, [0, -0.073, 0.012], [0.014, 0.018, 0.014]);
       fingers.push(digit);
     }
     const thumb = new Group();
-    thumb.position.set(side * -0.07, -0.005, 0.014);
+    thumb.position.set(side * -0.07, -0.004, 0.014);
     hand.add(thumb);
-    addCapsule(thumb, 0.018, 0.065, skin, [side * -0.018, -0.033, 0.018]);
+    addCapsule(thumb, 0.018, 0.066, skin, [side * -0.018, -0.033, 0.018]);
 
     return { shoulder, elbow, hand, fingers, thumb };
   };
