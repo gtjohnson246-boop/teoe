@@ -3,6 +3,7 @@ const menu = document.getElementById('menu');
 const playButton = document.getElementById('play-button');
 const grassGame = document.getElementById('grass-game');
 const grassCanvas = document.getElementById('grass-canvas');
+const bloodOverlay = document.getElementById('blood-overlay');
 const grassStatus = document.getElementById('grass-status');
 const grassControls = document.getElementById('grass-controls');
 const backButton = document.getElementById('back-button');
@@ -73,6 +74,64 @@ function playGrabSound() {
   });
 }
 
+function playShotSound() {
+  if (!voiceAudioContext) return;
+
+  if (voiceAudioContext.state === 'suspended') {
+    void voiceAudioContext.resume().catch((error) => {
+      console.error('Could not enable the shot sound:', error);
+    });
+  }
+
+  const now = voiceAudioContext.currentTime;
+  const duration = 0.2;
+  const noiseBuffer = voiceAudioContext.createBuffer(
+    1,
+    Math.ceil(voiceAudioContext.sampleRate * duration),
+    voiceAudioContext.sampleRate
+  );
+  const noiseSamples = noiseBuffer.getChannelData(0);
+  for (let index = 0; index < noiseSamples.length; index += 1) {
+    noiseSamples[index] = (Math.random() * 2 - 1) * (1 - index / noiseSamples.length);
+  }
+
+  const noise = voiceAudioContext.createBufferSource();
+  noise.buffer = noiseBuffer;
+  const filter = voiceAudioContext.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(2400, now);
+  filter.frequency.exponentialRampToValueAtTime(350, now + duration);
+  const noiseGain = voiceAudioContext.createGain();
+  noiseGain.gain.setValueAtTime(0.75, now);
+  noiseGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+  noise.connect(filter).connect(noiseGain).connect(voiceAudioContext.destination);
+  noise.start(now);
+  noise.stop(now + duration);
+
+  const thump = voiceAudioContext.createOscillator();
+  const thumpGain = voiceAudioContext.createGain();
+  thump.type = 'sine';
+  thump.frequency.setValueAtTime(105, now);
+  thump.frequency.exponentialRampToValueAtTime(38, now + 0.16);
+  thumpGain.gain.setValueAtTime(0.55, now);
+  thumpGain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+  thump.connect(thumpGain).connect(voiceAudioContext.destination);
+  thump.start(now);
+  thump.stop(now + 0.16);
+}
+
+function resetBleedingEffect() {
+  bloodOverlay.classList.remove('is-hit', 'is-bleeding');
+}
+
+function showBleedingEffect() {
+  bloodOverlay.classList.remove('is-hit');
+  bloodOverlay.classList.add('is-bleeding');
+  void bloodOverlay.offsetWidth;
+  bloodOverlay.classList.add('is-hit');
+  window.setTimeout(() => bloodOverlay.classList.remove('is-hit'), 350);
+}
+
 function stopCharacterVoice() {
   characterVoice.pause();
   characterVoice.currentTime = 0;
@@ -112,6 +171,7 @@ async function createGrassScene() {
       InstancedMesh,
       Matrix4,
       Mesh,
+      MeshBasicMaterial,
       MeshStandardMaterial,
       PerspectiveCamera,
       PlaneGeometry,
@@ -279,9 +339,10 @@ async function createGrassScene() {
 
   let livingRoomPromise = null;
   const buildLivingRoom = async () => {
-    const [roomGltf, couchGltf] = await Promise.all([
+    const [roomGltf, couchGltf, rifleGltf] = await Promise.all([
       loadModel('living-room/scene.gltf'),
-      loadModel('couch/scene.gltf')
+      loadModel('couch/scene.gltf'),
+      loadModel('hunting-rifle/scene.gltf')
     ]);
     const roomScene = new Scene();
     roomScene.background = new Color(0x10131a);
@@ -329,17 +390,50 @@ async function createGrassScene() {
     character.root.position.set(0, 0, encounterStartZ);
     roomScene.add(character.root);
 
+    const rifle = rifleGltf.scene;
+    rifle.updateMatrixWorld(true);
+    const rifleBounds = new Box3().setFromObject(rifle);
+    const rifleSize = rifleBounds.getSize(new Vector3());
+    rifle.scale.setScalar(0.82 / Math.max(rifleSize.x, rifleSize.y, rifleSize.z));
+    rifle.updateMatrixWorld(true);
+    const normalizedRifleBounds = new Box3().setFromObject(rifle);
+    const rifleCenter = normalizedRifleBounds.getCenter(new Vector3());
+    rifle.position.set(-rifleCenter.x, -rifleCenter.y, -rifleCenter.z);
+    const rifleGrip = new Group();
+    rifleGrip.name = 'hunting rifle grip';
+    rifleGrip.position.set(0, -0.015, 0.1);
+    rifleGrip.rotation.x = Math.PI / 2;
+    rifleGrip.add(rifle);
+    rifleGrip.visible = false;
+    character.rightHand.add(rifleGrip);
+
+    const muzzleFlash = new Mesh(
+      new SphereGeometry(1, 12, 8),
+      new MeshBasicMaterial({ color: 0xffa33a })
+    );
+    muzzleFlash.position.set(0, 0, 0.43);
+    muzzleFlash.scale.set(0.045, 0.045, 0.16);
+    muzzleFlash.visible = false;
+    rifleGrip.add(muzzleFlash);
+
     let encounterStartTime = null;
     let voiceStarted = false;
     let voiceError = false;
     let grabSoundPlayed = false;
+    let speechFinishedElapsed = null;
+    let shotElapsed = null;
     const beginEncounter = () => {
       stopCharacterVoice();
       resetGrabSound();
+      resetBleedingEffect();
       encounterStartTime = performance.now();
       voiceStarted = false;
       voiceError = false;
       grabSoundPlayed = false;
+      speechFinishedElapsed = null;
+      shotElapsed = null;
+      rifleGrip.visible = false;
+      muzzleFlash.visible = false;
       character.root.position.set(0, 0, encounterStartZ);
       grassStatus.textContent = 'He grabs you...';
       grassStatus.removeAttribute('data-error');
@@ -386,6 +480,13 @@ async function createGrassScene() {
       character.rightThumb.rotation.y = -0.22 * smoothReach;
 
       const impact = Math.max(0, 1 - Math.abs(elapsed - 1.15) / 0.42);
+      const aimProgress = speechFinishedElapsed === null
+        ? 0
+        : Math.max(0, Math.min(1, (elapsed - speechFinishedElapsed - 0.15) / 0.65));
+      const smoothAim = aimProgress * aimProgress * (3 - 2 * aimProgress);
+      character.rightShoulder.rotation.z = 0.32 * smoothReach - 0.18 * smoothAim;
+      character.rightElbow.rotation.x = 0.95 * smoothReach - 0.22 * smoothAim;
+      rifleGrip.visible = speechFinishedElapsed !== null;
 
       if (!voiceStarted && elapsed >= 1.15) {
         voiceStarted = true;
@@ -419,14 +520,30 @@ async function createGrassScene() {
       character.head.rotation.x = Math.sin(time * 0.003) * mouthOpening * 0.08 - mouthOpening * 0.08;
       character.head.rotation.y = Math.sin(time * 0.0018) * 0.035;
 
-      if (voiceStarted && characterVoice.ended && !voiceError) {
-        grassStatus.textContent = '';
+      if (voiceStarted && speechFinishedElapsed === null && (characterVoice.ended || voiceError)) {
+        speechFinishedElapsed = elapsed;
         character.mouth.scale.y = 0.35;
         character.jaw.rotation.x = 0;
-        encounterStartTime = null;
+        grassStatus.textContent = 'He raises his rifle...';
       }
 
-      return Math.max(impact, voiceStarted && !characterVoice.ended ? 0.18 : 0);
+      if (speechFinishedElapsed !== null && shotElapsed === null && elapsed - speechFinishedElapsed >= 1.2) {
+        shotElapsed = elapsed;
+        muzzleFlash.visible = true;
+        grassStatus.textContent = 'You have been shot. You are bleeding...';
+        showBleedingEffect();
+        playShotSound();
+      }
+
+      if (shotElapsed !== null && elapsed - shotElapsed >= 0.12) {
+        muzzleFlash.visible = false;
+      }
+
+      const shotImpact = shotElapsed === null
+        ? 0
+        : Math.max(0, 1 - (elapsed - shotElapsed) / 0.8);
+      const voiceIntensity = voiceStarted && !characterVoice.ended && !voiceError ? 0.18 : 0;
+      return Math.max(impact, voiceIntensity, shotImpact);
     };
 
     return {
