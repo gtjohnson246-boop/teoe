@@ -1,10 +1,12 @@
 import {
   BoxGeometry,
+  Box3,
   CapsuleGeometry,
   Group,
   Mesh,
   MeshStandardMaterial,
-  SphereGeometry
+  SphereGeometry,
+  Vector3
 } from 'three';
 
 function createProceduralCasualMale() {
@@ -159,7 +161,10 @@ export async function createCasualMale() {
     model.name = 'freddie model';
     model.scale.setScalar(0.15);
     model.rotation.y = Math.PI;
-    model.position.set(0, 0.1, 0);
+    model.updateMatrixWorld(true);
+    const modelBounds = new Box3().setFromObject(model);
+    const modelCenter = modelBounds.getCenter(new Vector3());
+    model.position.set(-modelCenter.x, -modelBounds.min.y, -modelCenter.z);
     root.add(model);
 
     const torso = new Group();
@@ -248,4 +253,3 @@ export async function createCasualMale() {
     return createProceduralCasualMale();
   }
 }
-
