@@ -150,10 +150,31 @@ function createProceduralCasualMale() {
 }
 
 export async function createCasualMale() {
+  const fallback = createProceduralCasualMale();
+
   try {
     const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
     const loader = new GLTFLoader();
     const gltf = await loader.loadAsync(new URL('./freddie_single_camera_speedscan_gltf/scene.gltf', import.meta.url).href);
+
+    const model = gltf.scene;
+    model.name = 'freddie model';
+    model.updateMatrixWorld(true);
+    const modelBounds = new Box3().setFromObject(model);
+    const size = modelBounds.getSize(new Vector3());
+    const isLikelyBroken =
+      !Number.isFinite(size.x) ||
+      !Number.isFinite(size.y) ||
+      !Number.isFinite(size.z) ||
+      size.x < 0.1 ||
+      size.y < 0.1 ||
+      size.z < 0.1 ||
+      model.children.length === 0;
+
+    if (isLikelyBroken) {
+      throw new Error('The Freddie model did not contain valid geometry.');
+    }
+
     const root = new Group();
     root.name = 'freddie';
 
@@ -161,12 +182,8 @@ export async function createCasualMale() {
     head.position.set(0, 1.68, 0);
     root.add(head);
 
-    const model = gltf.scene;
-    model.name = 'freddie model';
     model.scale.setScalar(0.035);
-    model.rotation.x = Math.PI / 2;
-    model.updateMatrixWorld(true);
-    const modelBounds = new Box3().setFromObject(model);
+    model.rotation.x = 0;
     const modelCenter = modelBounds.getCenter(new Vector3());
     model.position.set(-modelCenter.x, -modelCenter.y, -modelCenter.z);
     head.add(model);
@@ -334,7 +351,7 @@ export async function createCasualMale() {
       rightThumb
     };
   } catch (error) {
-    console.warn('Failed to load Freddie model; falling back to the original procedural character.', error);
-    return createProceduralCasualMale();
+    console.warn('Freddie model failed validation; falling back to the procedural character.', error);
+    return fallback;
   }
 }
