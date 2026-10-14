@@ -345,11 +345,12 @@ async function createGrassScene() {
 
   let livingRoomPromise = null;
   const buildLivingRoom = async () => {
-    const [roomGltf, couchGltf, rifleGltf, tableGltf, brickBaseColor] = await Promise.all([
+    const [roomGltf, couchGltf, rifleGltf, tableGltf, monitorGltf, brickBaseColor] = await Promise.all([
       loadModel('living-room/scene.gltf'),
       loadModel('couch/scene.gltf'),
       loadModel('hunting-rifle/scene.gltf'),
       loadModel('pizzeria-table/scene.gltf'),
+      loadModel('basic-pc-monitors/scene.gltf'),
       new TextureLoader().loadAsync('brick-stack/brick-wall.jpg')
     ]);
     const roomScene = new Scene();
@@ -702,7 +703,60 @@ async function createGrassScene() {
     furnishingBox('dusty mattress', [2.5, 0.24, 3.25], [-9.3, 0.63, 4.4], fadedFabric);
     furnishingBox('dusty pillow', [1.25, 0.18, 0.72], [-9.3, 0.82, 5.45], fadedFabric);
     furnishingBox('empty bookcase', [2.8, 2.7, 0.55], [9.7, 1.35, 6.7], woodMaterial);
-    furnishingBox('north room worktable', [2.7, 0.18, 1.5], [-9.4, 1.05, -6.1], woodMaterial);
+    furnishingBox('abandoned security-room console', [2.7, 0.18, 1.5], [-9.4, 1.05, -6.1], woodMaterial, Math.PI / 2);
+
+    const securityMonitors = monitorGltf.scene;
+    securityMonitors.name = 'widescreen and standard security monitors';
+    securityMonitors.updateMatrixWorld(true);
+    const sourceMonitorBounds = new Box3().setFromObject(securityMonitors);
+    const sourceMonitorSize = sourceMonitorBounds.getSize(new Vector3());
+    securityMonitors.rotation.y = -Math.PI / 2;
+    securityMonitors.scale.setScalar(1.95 / sourceMonitorSize.x);
+    securityMonitors.updateMatrixWorld(true);
+    const monitorBounds = new Box3().setFromObject(securityMonitors);
+    securityMonitors.position.set(
+      -9.4 - (monitorBounds.min.x + monitorBounds.max.x) / 2,
+      1.14 - monitorBounds.min.y,
+      -6.1 - (monitorBounds.min.z + monitorBounds.max.z) / 2
+    );
+    destinationScene.add(securityMonitors);
+
+    const securitySignCanvas = document.createElement('canvas');
+    securitySignCanvas.width = 512;
+    securitySignCanvas.height = 128;
+    const securitySignContext = securitySignCanvas.getContext('2d');
+    if (!securitySignContext) {
+      throw new Error('Could not create the abandoned security-room sign.');
+    }
+    securitySignContext.translate(securitySignCanvas.width, 0);
+    securitySignContext.scale(-1, 1);
+    securitySignContext.fillStyle = '#151a17';
+    securitySignContext.fillRect(0, 0, securitySignCanvas.width, securitySignCanvas.height);
+    securitySignContext.strokeStyle = '#626b59';
+    securitySignContext.lineWidth = 6;
+    securitySignContext.strokeRect(5, 5, securitySignCanvas.width - 10, securitySignCanvas.height - 10);
+    securitySignContext.textAlign = 'center';
+    securitySignContext.fillStyle = '#c4cbb4';
+    securitySignContext.font = 'bold 38px monospace';
+    securitySignContext.fillText('SECURITY ROOM', 256, 55);
+    securitySignContext.fillStyle = '#b64b43';
+    securitySignContext.font = 'bold 18px monospace';
+    securitySignContext.fillText('CAMERA CONTROL', 256, 91);
+    const securitySignTexture = new CanvasTexture(securitySignCanvas);
+    securitySignTexture.colorSpace = SRGBColorSpace;
+    const securitySign = new Mesh(
+      new PlaneGeometry(2.45, 0.62),
+      new MeshBasicMaterial({ map: securitySignTexture, side: DoubleSide })
+    );
+    securitySign.name = 'abandoned security-room sign';
+    securitySign.position.set(-11.66, 2.24, -6.1);
+    securitySign.rotation.y = Math.PI / 2;
+    destinationScene.add(securitySign);
+
+    const monitorGlow = new PointLight(0x92aeb5, 0.28, 4, 2);
+    monitorGlow.position.set(-9.1, 1.75, -6.1);
+    destinationScene.add(monitorGlow);
+
     furnishingBox('second collapsed bed frame', [2.6, 0.34, 3.4], [9.2, 0.34, -4.3], woodMaterial);
     furnishingBox('second dusty mattress', [2.5, 0.24, 3.25], [9.2, 0.63, -4.3], fadedFabric);
     furnishingBox('second dusty pillow', [1.25, 0.18, 0.72], [9.2, 0.82, -5.35], fadedFabric);
