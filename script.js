@@ -162,6 +162,7 @@ async function createGrassScene() {
       BufferGeometry,
       CanvasTexture,
       Color,
+      CylinderGeometry,
       DirectionalLight,
       DoubleSide,
       Euler,
@@ -464,8 +465,10 @@ async function createGrassScene() {
     wallBrick('x', 8, 24, 6, [
       (x, row) => Math.abs(x) < 0.9 && row < 4
     ]);
-    wallBrick('z', -12, 16, 6, []);
-    wallBrick('z', 12, 16, 6, []);
+    const brokenWindowOpening = (position, row) =>
+      row >= 2 && row <= 4 && [-4, 4].some((center) => Math.abs(position - center) < 1.35);
+    wallBrick('z', -12, 16, 6, [brokenWindowOpening]);
+    wallBrick('z', 12, 16, 6, [brokenWindowOpening]);
 
     const doorway = (...centers) => (position, row) =>
       centers.some((center) => Math.abs(position - center) < 0.9) && row < 4;
@@ -529,6 +532,76 @@ async function createGrassScene() {
       destinationScene.add(furnishing);
       return furnishing;
     };
+
+    const windowFrameMaterial = new MeshStandardMaterial({ color: 0x382b21, roughness: 1 });
+    const windowGlassMaterial = new MeshStandardMaterial({
+      color: 0x344044,
+      roughness: 0.48,
+      metalness: 0.12,
+      transparent: true,
+      opacity: 0.38
+    });
+    for (const side of [-1, 1]) {
+      for (const centerZ of [-4, 4]) {
+        furnishingBox('dark broken window recess', [0.12, 1.5, 2.35], [side * 11.98, 2.63, centerZ], windowGlassMaterial);
+        furnishingBox('splintered window sill', [0.24, 0.13, 2.9], [side * 11.78, 1.79, centerZ], windowFrameMaterial);
+        furnishingBox('weathered window lintel', [0.22, 0.14, 2.9], [side * 11.78, 3.48, centerZ], windowFrameMaterial);
+        for (const offset of [-1.34, 1.34]) {
+          furnishingBox('rotted window jamb', [0.22, 1.78, 0.14], [side * 11.78, 2.63, centerZ + offset], windowFrameMaterial);
+        }
+        furnishingBox('broken window crossbar', [0.18, 0.09, 2.55], [side * 11.78, 2.5, centerZ], windowFrameMaterial);
+        furnishingBox('loose window board', [0.14, 0.2, 1.45], [side * 11.76, 2.95, centerZ + 0.32], woodMaterial, side * 0.025);
+      }
+    }
+
+    const kitchenWood = new MeshStandardMaterial({ color: 0x49372a, roughness: 1 });
+    const kitchenDoor = new MeshStandardMaterial({ color: 0x594333, roughness: 0.95 });
+    const tarnishedMetal = new MeshStandardMaterial({ color: 0x73756d, roughness: 0.72, metalness: 0.42 });
+    const darkMetal = new MeshStandardMaterial({ color: 0x252725, roughness: 0.76, metalness: 0.28 });
+    const stainedTile = new MeshStandardMaterial({ color: 0x9b927a, roughness: 0.92 });
+    const kitchenBox = (name, size, position, material, rotationY = 0) =>
+      furnishingBox(name, size, position, material, rotationY);
+
+    kitchenBox('kitchen cabinet carcass', [5.55, 0.82, 0.68], [0, 0.43, -7.18], kitchenWood);
+    kitchenBox('cracked kitchen countertop', [5.9, 0.14, 0.88], [0, 0.91, -6.98], tarnishedMetal);
+    kitchenBox('grease-stained kitchen backsplash', [5.8, 1.1, 0.1], [0, 1.52, -7.65], stainedTile);
+    for (let index = 0; index < 5; index += 1) {
+      const x = -2.2 + index * 1.1;
+      kitchenBox('warped lower cabinet door', [1.02, 0.66, 0.055], [x, 0.43, -6.81], kitchenDoor);
+      kitchenBox('rusted cabinet pull', [0.16, 0.035, 0.045], [x + 0.34, 0.47, -6.76], tarnishedMetal);
+    }
+
+    kitchenBox('sagging wall cupboards', [4.25, 1.05, 0.56], [0.15, 2.47, -7.56], kitchenWood);
+    for (const x of [-1.35, -0.15, 1.05, 2.25]) {
+      kitchenBox('stained upper cupboard door', [1.12, 0.91, 0.06], [x, 2.47, -7.25], kitchenDoor);
+      kitchenBox('upper cupboard handle', [0.045, 0.24, 0.045], [x + 0.42, 2.47, -7.19], tarnishedMetal);
+    }
+
+    kitchenBox('old range cooker', [1.15, 0.88, 0.74], [-1.72, 0.47, -7.02], darkMetal);
+    kitchenBox('range oven door', [0.86, 0.49, 0.045], [-1.72, 0.39, -6.63], tarnishedMetal);
+    kitchenBox('oven handle', [0.55, 0.045, 0.06], [-1.72, 0.7, -6.58], darkMetal);
+    for (const xOffset of [-0.32, 0.32]) {
+      for (const zOffset of [-0.2, 0.2]) {
+        const burner = new Mesh(new CylinderGeometry(0.14, 0.14, 0.035, 16), darkMetal);
+        burner.name = 'rusty cooker burner';
+        burner.position.set(-1.72 + xOffset, 1.01, -7.02 + zOffset);
+        destinationScene.add(burner);
+      }
+    }
+
+    kitchenBox('enamel sink', [1.14, 0.11, 0.6], [1.12, 1.01, -6.98], darkMetal);
+    kitchenBox('sink basin', [0.78, 0.08, 0.4], [1.12, 1.08, -6.98], tarnishedMetal);
+    const faucetStem = new Mesh(new CylinderGeometry(0.035, 0.045, 0.35, 10), tarnishedMetal);
+    faucetStem.name = 'rusting sink faucet';
+    faucetStem.position.set(1.12, 1.25, -7.34);
+    destinationScene.add(faucetStem);
+    kitchenBox('faucet spout', [0.26, 0.045, 0.045], [1.24, 1.39, -7.2], tarnishedMetal);
+
+    kitchenBox('abandoned refrigerator', [1.05, 2.15, 0.92], [3.12, 1.08, -5.25], tarnishedMetal);
+    kitchenBox('refrigerator door', [0.96, 1.92, 0.07], [3.12, 1.15, -4.77], kitchenDoor);
+    kitchenBox('refrigerator handle', [0.045, 0.68, 0.07], [3.5, 1.38, -4.7], tarnishedMetal);
+    kitchenBox('fallen kitchen cupboard door', [0.09, 1.25, 0.74], [-3.35, 0.08, -6.2], kitchenDoor, 0.28);
+    kitchenBox('abandoned cooking pot', [0.42, 0.2, 0.42], [0.1, 1.08, -6.98], darkMetal);
 
     const table = tableGltf.scene;
     table.updateMatrixWorld(true);
@@ -628,47 +701,83 @@ async function createGrassScene() {
     furnishingBox('collapsed bed frame', [2.6, 0.34, 3.4], [-9.3, 0.34, 4.4], woodMaterial);
     furnishingBox('dusty mattress', [2.5, 0.24, 3.25], [-9.3, 0.63, 4.4], fadedFabric);
     furnishingBox('dusty pillow', [1.25, 0.18, 0.72], [-9.3, 0.82, 5.45], fadedFabric);
-    furnishingBox('broken writing desk', [2.8, 0.18, 1.35], [-1.5, 1.05, -5.7], woodMaterial);
-    furnishingBox('desk pedestal', [0.42, 1, 1.1], [-2.55, 0.5, -5.7], woodMaterial);
     furnishingBox('empty bookcase', [2.8, 2.7, 0.55], [9.7, 1.35, 6.7], woodMaterial);
     furnishingBox('north room worktable', [2.7, 0.18, 1.5], [-9.4, 1.05, -6.1], woodMaterial);
-    furnishingBox('north room cabinet', [2, 1.8, 0.8], [1.8, 0.9, -6.7], woodMaterial);
     furnishingBox('second collapsed bed frame', [2.6, 0.34, 3.4], [9.2, 0.34, -4.3], woodMaterial);
     furnishingBox('second dusty mattress', [2.5, 0.24, 3.25], [9.2, 0.63, -4.3], fadedFabric);
     furnishingBox('second dusty pillow', [1.25, 0.18, 0.72], [9.2, 0.82, -5.35], fadedFabric);
 
     const roofBeamMaterial = new MeshStandardMaterial({ color: 0x30271d, roughness: 1 });
-    for (const z of [-5.3, 0, 5.3]) {
-      const beam = new Mesh(new BoxGeometry(24, 0.2, 0.22), roofBeamMaterial);
-      beam.position.set(0, 4.58, z);
-      destinationScene.add(beam);
-    }
+    const roofSheetGeometry = new BoxGeometry(3.99, 0.14, 8.78);
+    const roofColors = [0x424843, 0x50534b, 0x3b423f, 0x5b4a3d, 0x454943, 0x383d3a];
+    const roofMaterials = roofColors.map((color) => new MeshStandardMaterial({
+      color,
+      roughness: 0.88,
+      metalness: 0.24
+    }));
+    const roofCenterY = 5.3;
+    const roofPitch = 0.16;
+    const roofHalfSpan = 8.72;
+    const roofSideCenter = roofHalfSpan / 2;
 
-    const roofTexture = brickBaseColor.clone();
-    roofTexture.repeat.set(16, 12);
-    roofTexture.needsUpdate = true;
-    const roof = new Mesh(
-      new BoxGeometry(25, 0.42, 17),
-      new MeshStandardMaterial({ map: roofTexture, color: 0x9d9385, roughness: 1 })
-    );
-    roof.name = 'solid brick roof';
-    roof.position.y = 4.83;
-    destinationScene.add(roof);
-
-    const pizzeriaRoofMaterial = new MeshStandardMaterial({
-      color: 0x873b30,
-      roughness: 0.92
-    });
     for (const side of [-1, 1]) {
-      const roofSlope = new Mesh(
-        new BoxGeometry(25.5, 0.28, 8.25),
-        pizzeriaRoofMaterial
-      );
-      roofSlope.name = 'pitched pizzeria roof';
-      roofSlope.position.set(0, 5.52, side * 4.05);
-      roofSlope.rotation.x = side * 0.16;
-      destinationScene.add(roofSlope);
+      for (let panel = 0; panel < 6; panel += 1) {
+        const sheet = new Mesh(roofSheetGeometry, roofMaterials[(panel * 2 + (side > 0 ? 1 : 0)) % roofMaterials.length]);
+        sheet.name = 'weathered corrugated roof sheet';
+        sheet.position.set(-10 + panel * 4, roofCenterY, side * roofSideCenter);
+        sheet.rotation.x = side * roofPitch;
+        destinationScene.add(sheet);
+      }
+
+      const rafterGeometry = new BoxGeometry(0.18, 0.2, roofHalfSpan);
+      for (let index = 0; index < 7; index += 1) {
+        const rafter = new Mesh(rafterGeometry, roofBeamMaterial);
+        rafter.name = 'exposed timber roof rafter';
+        rafter.position.set(-10 + index * (20 / 6), roofCenterY, side * roofSideCenter);
+        rafter.rotation.x = side * roofPitch;
+        destinationScene.add(rafter);
+      }
     }
+
+    const roofRibMaterial = new MeshStandardMaterial({ color: 0x252c28, roughness: 0.78, metalness: 0.3 });
+    const roofRibGeometry = new BoxGeometry(0.055, 0.065, roofHalfSpan);
+    for (const side of [-1, 1]) {
+      const ribs = new InstancedMesh(roofRibGeometry, roofRibMaterial, 45);
+      ribs.name = 'raised seams on corrugated roof';
+      for (let index = 0; index < 45; index += 1) {
+        const x = -12 + index * (24 / 44);
+        const position = new Vector3(x, roofCenterY + 0.09, side * roofSideCenter);
+        const rotation = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), side * roofPitch);
+        const transform = new Matrix4().compose(position, rotation, new Vector3(1, 1, 1));
+        ribs.setMatrixAt(index, transform);
+      }
+      ribs.instanceMatrix.needsUpdate = true;
+      destinationScene.add(ribs);
+    }
+
+    const repairMaterial = new MeshStandardMaterial({ color: 0x70483a, roughness: 0.94, metalness: 0.12 });
+    for (const [x, side, distance] of [
+      [-8.2, -1, 2.4], [-1.8, -1, 5.8], [6.2, -1, 3.3],
+      [-5.5, 1, 6.2], [2.8, 1, 2.8], [9.2, 1, 5.1]
+    ]) {
+      const patch = new Mesh(new BoxGeometry(1.2, 0.08, 1.45), repairMaterial);
+      patch.name = 'rusty patch on roof';
+      patch.position.set(
+        x,
+        roofCenterY + (roofSideCenter - distance) * Math.sin(roofPitch) + 0.1,
+        side * distance
+      );
+      patch.rotation.x = side * roofPitch;
+      destinationScene.add(patch);
+    }
+
+    const ridgeCap = new Mesh(
+      new BoxGeometry(25.4, 0.24, 0.48),
+      new MeshStandardMaterial({ color: 0x343a35, roughness: 0.82, metalness: 0.32 })
+    );
+    ridgeCap.name = 'weathered metal roof ridge cap';
+    ridgeCap.position.set(0, roofCenterY + roofSideCenter * Math.sin(roofPitch) + 0.04, 0);
+    destinationScene.add(ridgeCap);
 
     const debrisCount = 64;
     const debris = new InstancedMesh(brickGeometry, brickMaterial, debrisCount);
