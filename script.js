@@ -15,9 +15,8 @@ characterVoice.preload = 'auto';
 const grabSound = new Audio('audio/grab-sound.mp3');
 grabSound.preload = 'auto';
 grabSound.volume = 0.9;
-const sharkSound = new Audio('audio/shark.mp3');
+const sharkSound = new Audio('https://actions.google.com/sounds/v1/animals/dog_barking.ogg');
 sharkSound.preload = 'auto';
-
 let introFinished = false;
 let grassScene = null;
 let grassLoading = false;
