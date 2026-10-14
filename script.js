@@ -184,6 +184,8 @@ async function createGrassScene() {
       RepeatWrapping,
       Scene,
       SRGBColorSpace,
+      Shape,
+      ShapeGeometry,
       SphereGeometry,
       TextureLoader,
       Vector2,
@@ -342,10 +344,11 @@ async function createGrassScene() {
 
   let livingRoomPromise = null;
   const buildLivingRoom = async () => {
-    const [roomGltf, couchGltf, rifleGltf, brickBaseColor] = await Promise.all([
+    const [roomGltf, couchGltf, rifleGltf, tableGltf, brickBaseColor] = await Promise.all([
       loadModel('living-room/scene.gltf'),
       loadModel('couch/scene.gltf'),
       loadModel('hunting-rifle/scene.gltf'),
+      loadModel('pizzeria-table/scene.gltf'),
       new TextureLoader().loadAsync('brick-stack/brick-wall.jpg')
     ]);
     const roomScene = new Scene();
@@ -479,18 +482,42 @@ async function createGrassScene() {
       0x45423a, 0x4b4339, 0x41453c
     ].map((color) => new MeshStandardMaterial({ color, roughness: 1 }));
     roomCenters.forEach(([x, z], index) => {
-      const rug = new Mesh(
-        new BoxGeometry(3.6, 0.035, 4.2),
-        rugMaterials[index]
-      );
-      rug.name = `abandoned room ${index + 1} rug`;
-      rug.position.set(x, -0.06, z);
-      destinationScene.add(rug);
+      if (index !== 4) {
+        const rug = new Mesh(
+          new BoxGeometry(3.6, 0.035, 4.2),
+          rugMaterials[index]
+        );
+        rug.name = `abandoned room ${index + 1} rug`;
+        rug.position.set(x, -0.06, z);
+        destinationScene.add(rug);
+      }
 
       const roomLight = new PointLight(0xc1c7b3, 0.65, 8, 2);
       roomLight.position.set(x, 3.1, z);
       destinationScene.add(roomLight);
     });
+
+    const tileGeometry = new PlaneGeometry(0.96, 0.96);
+    const tileMaterial = new MeshStandardMaterial({ color: 0xffffff, roughness: 0.82 });
+    const partyFloor = new InstancedMesh(tileGeometry, tileMaterial, 64);
+    partyFloor.name = 'red and cream party-room checkerboard';
+    const tilePosition = new Vector3();
+    const tileRotation = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), -Math.PI / 2);
+    const tileScale = new Vector3(1, 1, 1);
+    const tileTransform = new Matrix4();
+    const tileColors = [new Color(0xa52c2d), new Color(0xe8d8ad)];
+    for (let row = 0; row < 8; row += 1) {
+      for (let column = 0; column < 8; column += 1) {
+        const index = row * 8 + column;
+        tilePosition.set(-3.5 + column, -0.035, 0.5 + row);
+        tileTransform.compose(tilePosition, tileRotation, tileScale);
+        partyFloor.setMatrixAt(index, tileTransform);
+        partyFloor.setColorAt(index, tileColors[(row + column) % 2]);
+      }
+    }
+    partyFloor.instanceMatrix.needsUpdate = true;
+    if (partyFloor.instanceColor) partyFloor.instanceColor.needsUpdate = true;
+    destinationScene.add(partyFloor);
 
     const woodMaterial = new MeshStandardMaterial({ color: 0x453629, roughness: 1 });
     const fadedFabric = new MeshStandardMaterial({ color: 0x666151, roughness: 1 });
@@ -503,11 +530,106 @@ async function createGrassScene() {
       return furnishing;
     };
 
+    const table = tableGltf.scene;
+    table.updateMatrixWorld(true);
+    const sourceTableBounds = new Box3().setFromObject(table);
+    const sourceTableSize = sourceTableBounds.getSize(new Vector3());
+    const tableScale = 2.35 / sourceTableSize.z;
+    const tableCenter = sourceTableBounds.getCenter(new Vector3());
+    table.scale.setScalar(tableScale);
+    table.position.set(
+      -tableCenter.x * tableScale,
+      -sourceTableBounds.min.y * tableScale,
+      -tableCenter.z * tableScale
+    );
+    for (const x of [-2.15, 2.15]) {
+      const partyTable = table.clone(true);
+      partyTable.name = 'textured pizzeria party table';
+      partyTable.position.x += x;
+      partyTable.position.z += 4.2;
+      destinationScene.add(partyTable);
+    }
+
+    const partyWallStripe = new MeshStandardMaterial({ color: 0x97332c, roughness: 1 });
+    const partyGoldStripe = new MeshStandardMaterial({ color: 0xd2a54e, roughness: 0.9 });
+    for (const x of [-3.72, 3.72]) {
+      furnishingBox('red pizzeria wall stripe', [0.12, 0.46, 7.7], [x, 1.55, 4], partyWallStripe);
+      furnishingBox('gold pizzeria wall stripe', [0.13, 0.1, 7.7], [x, 1.84, 4], partyGoldStripe);
+    }
+
+    const signCanvas = document.createElement('canvas');
+    signCanvas.width = 640;
+    signCanvas.height = 240;
+    const signContext = signCanvas.getContext('2d');
+    if (!signContext) {
+      throw new Error('Could not create the pizzeria party-room sign.');
+    }
+    signContext.fillStyle = '#8f2927';
+    signContext.fillRect(0, 0, signCanvas.width, signCanvas.height);
+    signContext.strokeStyle = '#f2cd73';
+    signContext.lineWidth = 14;
+    signContext.strokeRect(10, 10, signCanvas.width - 20, signCanvas.height - 20);
+    signContext.textAlign = 'center';
+    signContext.fillStyle = '#fff0c8';
+    signContext.font = 'bold 94px sans-serif';
+    signContext.fillText('PIZZERIA', 320, 112);
+    signContext.fillStyle = '#f2cd73';
+    signContext.font = 'bold 40px sans-serif';
+    signContext.fillText('PARTY ROOM', 320, 184);
+    const signTexture = new CanvasTexture(signCanvas);
+    signTexture.colorSpace = SRGBColorSpace;
+    const partySign = new Mesh(
+      new BoxGeometry(3.2, 1.2, 0.12),
+      new MeshStandardMaterial({
+        map: signTexture,
+        emissive: 0xffa63c,
+        emissiveMap: signTexture,
+        emissiveIntensity: 0.32,
+        roughness: 0.75
+      })
+    );
+    partySign.name = 'illuminated pizzeria party-room sign';
+    partySign.position.set(0, 3.05, 7.55);
+    destinationScene.add(partySign);
+
+    const flagShape = new Shape();
+    flagShape.moveTo(-0.28, 0.2);
+    flagShape.lineTo(0.28, 0.2);
+    flagShape.lineTo(0, -0.3);
+    flagShape.closePath();
+    const flagGeometry = new ShapeGeometry(flagShape);
+    const flagColors = [0xc53931, 0xe5bd56, 0x4b7890, 0xd9d1ae];
+    for (let index = 0; index < 12; index += 1) {
+      const flag = new Mesh(
+        flagGeometry,
+        new MeshStandardMaterial({
+          color: flagColors[index % flagColors.length],
+          roughness: 0.9,
+          side: DoubleSide
+        })
+      );
+      flag.name = 'party bunting flag';
+      flag.position.set(-3.25 + index * 0.59, 3.75, 7.44);
+      destinationScene.add(flag);
+    }
+
+    const balloonColors = [0xc93235, 0xe9c650, 0x417b91, 0x6f944c, 0xd98c4d];
+    balloonColors.forEach((color, index) => {
+      const balloon = new Mesh(
+        new SphereGeometry(0.32, 16, 12),
+        new MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.04 })
+      );
+      balloon.name = 'party balloon';
+      balloon.scale.set(0.82, 1.14, 0.82);
+      balloon.position.set(3.15 + Math.sin(index * 1.25) * 0.34, 2.75 + index * 0.17, 2.6 + Math.cos(index * 1.1) * 0.3);
+      destinationScene.add(balloon);
+    });
+
     furnishingBox('collapsed bed frame', [2.6, 0.34, 3.4], [-9.3, 0.34, 4.4], woodMaterial);
     furnishingBox('dusty mattress', [2.5, 0.24, 3.25], [-9.3, 0.63, 4.4], fadedFabric);
     furnishingBox('dusty pillow', [1.25, 0.18, 0.72], [-9.3, 0.82, 5.45], fadedFabric);
-    furnishingBox('broken writing desk', [2.8, 0.18, 1.35], [2.2, 1.05, 5.9], woodMaterial);
-    furnishingBox('desk pedestal', [0.42, 1, 1.1], [1.15, 0.5, 5.9], woodMaterial);
+    furnishingBox('broken writing desk', [2.8, 0.18, 1.35], [-1.5, 1.05, -5.7], woodMaterial);
+    furnishingBox('desk pedestal', [0.42, 1, 1.1], [-2.55, 0.5, -5.7], woodMaterial);
     furnishingBox('empty bookcase', [2.8, 2.7, 0.55], [9.7, 1.35, 6.7], woodMaterial);
     furnishingBox('north room worktable', [2.7, 0.18, 1.5], [-9.4, 1.05, -6.1], woodMaterial);
     furnishingBox('north room cabinet', [2, 1.8, 0.8], [1.8, 0.9, -6.7], woodMaterial);
@@ -533,6 +655,21 @@ async function createGrassScene() {
     roof.position.y = 4.83;
     destinationScene.add(roof);
 
+    const pizzeriaRoofMaterial = new MeshStandardMaterial({
+      color: 0x873b30,
+      roughness: 0.92
+    });
+    for (const side of [-1, 1]) {
+      const roofSlope = new Mesh(
+        new BoxGeometry(25.5, 0.28, 8.25),
+        pizzeriaRoofMaterial
+      );
+      roofSlope.name = 'pitched pizzeria roof';
+      roofSlope.position.set(0, 5.52, side * 4.05);
+      roofSlope.rotation.x = side * 0.16;
+      destinationScene.add(roofSlope);
+    }
+
     const debrisCount = 64;
     const debris = new InstancedMesh(brickGeometry, brickMaterial, debrisCount);
     debris.name = 'fallen bricks and rubble';
@@ -547,7 +684,10 @@ async function createGrassScene() {
       do {
         x = (random() - 0.5) * 22;
         z = (random() - 0.5) * 14;
-      } while (Math.hypot(x, z - 4.5) < 1.7);
+      } while (
+        Math.hypot(x, z - 4.5) < 1.7
+        || (Math.abs(x) < 3.6 && z > 0 && z < 8)
+      );
 
       const width = 0.72 + random() * 0.55;
       const height = 0.3 + random() * 0.34;

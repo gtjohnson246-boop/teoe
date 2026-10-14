@@ -18,22 +18,20 @@ enum class GameState {
 static int runHeadless(const fs::path& fontPath);
 
 static fs::path resolveAssetPath(const std::string& filename) {
-    const std::vector<fs::path> candidates = {
-        fs::current_path() / filename,
-        fs::path("./") / filename,
-    };
+    std::vector<fs::path> searchRoots;
+    searchRoots.push_back(fs::current_path());
 
-    for (const auto& candidate : candidates) {
+    std::error_code ec;
+    const fs::path executablePath = fs::canonical("/proc/self/exe", ec);
+    if (!ec) {
+        searchRoots.push_back(executablePath.parent_path());
+    }
+
+    for (const auto& root : searchRoots) {
+        const fs::path candidate = root / filename;
         if (fs::exists(candidate)) {
             return candidate;
         }
-    }
-
-    const auto exePath = fs::read_symlink("/proc/self/exe");
-    const fs::path executableDir = exePath.parent_path();
-    const fs::path fallback = executableDir / filename;
-    if (fs::exists(fallback)) {
-        return fallback;
     }
 
     return fs::path(filename);
@@ -152,8 +150,38 @@ static int runWindow(const fs::path& fontPath) {
 
 static int runHeadless(const fs::path& fontPath) {
     (void)fontPath;
-    const std::string command = "python3 render_headless.py";
+
+    const fs::path scriptPath = resolveAssetPath("render_headless.py");
+    if (!fs::exists(scriptPath)) {
+        std::cerr << "Error: Could not find render_headless.py." << std::endl;
+        return -1;
+    }
+
+    const fs::path originalPath = fs::current_path();
+    const fs::path scriptDir = scriptPath.parent_path();
+    const bool shouldRestorePath = !scriptDir.empty() && scriptDir != originalPath;
+
+    if (shouldRestorePath) {
+        std::error_code ec;
+        fs::current_path(scriptDir, ec);
+        if (ec) {
+            std::cerr << "Error: Could not switch to project directory " << scriptDir << std::endl;
+            return -1;
+        }
+    }
+
+    const std::string command = "python3 \"" + scriptPath.string() + "\"";
     const int status = std::system(command.c_str());
+
+    if (shouldRestorePath) {
+        std::error_code ec;
+        fs::current_path(originalPath, ec);
+        if (ec) {
+            std::cerr << "Error: Could not restore working directory to " << originalPath << std::endl;
+            return -1;
+        }
+    }
+
     if (status != 0) {
         std::cerr << "Error: headless render failed." << std::endl;
         return -1;
