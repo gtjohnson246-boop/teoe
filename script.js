@@ -15,6 +15,8 @@ characterVoice.preload = 'auto';
 const grabSound = new Audio('audio/grab-sound.mp3');
 grabSound.preload = 'auto';
 grabSound.volume = 0.9;
+const sharkSound = new Audio('audio/shark.mp3');
+sharkSound.preload = 'auto';
 
 let introFinished = false;
 let grassScene = null;
@@ -35,6 +37,7 @@ let lastLookY = 0;
 let voiceAudioContext = null;
 let voiceAnalyser = null;
 let voiceSource = null;
+let sharkAudioSource = null;
 let voiceWaveform = null;
 
 function unlockCharacterVoice() {
@@ -49,6 +52,9 @@ function unlockCharacterVoice() {
       voiceSource = voiceAudioContext.createMediaElementSource(characterVoice);
       voiceSource.connect(voiceAnalyser);
       voiceAnalyser.connect(voiceAudioContext.destination);
+
+      sharkAudioSource = voiceAudioContext.createMediaElementSource(sharkSound);
+      sharkAudioSource.connect(voiceAudioContext.destination);
     }
 
     if (voiceAudioContext.state === 'suspended') {
@@ -143,6 +149,11 @@ function stopCharacterVoice() {
 function resetGrabSound() {
   grabSound.pause();
   grabSound.currentTime = 0;
+}
+
+function stopSharkSound() {
+  sharkSound.pause();
+  sharkSound.currentTime = 0;
 }
 
 function finishIntro() {
@@ -1001,6 +1012,7 @@ async function createGrassScene() {
     const beginEncounter = () => {
       stopCharacterVoice();
       resetGrabSound();
+      stopSharkSound();
       resetBleedingEffect();
       visionBlink.classList.remove('is-blinking');
       encounterStartTime = performance.now();
@@ -1031,6 +1043,7 @@ async function createGrassScene() {
       teethJaw.rotation.z = Math.sin(time * 0.004) * 0.14;
       animatronicGlow.intensity = 1.1 + Math.sin(time * 0.006) * 0.3;
       if (!destinationActive || animatronicDead) {
+        stopSharkSound();
         if (animatronicDeathStartedAt !== null) {
           const lungeProgress = Math.min(1, (time - animatronicDeathStartedAt) / 420);
           animatronicRoot.position
@@ -1050,11 +1063,22 @@ async function createGrassScene() {
         .intersectObject(animatronicRoot, true)
         .length > 0;
       if (!isLookingAtAnimatronic) {
+        stopSharkSound();
         animatronicGazeSeconds = 0;
         if (grassStatus.textContent.startsWith('It noticed you looking')) {
           grassStatus.textContent = '';
         }
         return;
+      }
+
+      if (sharkSound.paused) {
+        if (voiceAudioContext?.state === 'suspended') {
+          void voiceAudioContext.resume();
+        }
+        sharkSound.currentTime = 0;
+        sharkSound.play().catch((error) => {
+          console.error('Could not play the shark sound:', error);
+        });
       }
 
       animatronicGazeSeconds += delta;
@@ -1076,6 +1100,7 @@ async function createGrassScene() {
       movementKeys.clear();
     };
     const respawnFromAnimatronic = () => {
+      stopSharkSound();
       animatronicDeath.hidden = true;
       resetBleedingEffect();
       animatronicGazeSeconds = 0;
@@ -1738,6 +1763,7 @@ backButton.addEventListener('click', () => {
   grassGame.hidden = true;
   menu.hidden = false;
   stopCharacterVoice();
+  stopSharkSound();
   visionBlink.classList.remove('is-blinking');
   movementKeys.clear();
   lampGazeSeconds = 0;
