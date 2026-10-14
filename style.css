@@ -178,6 +178,47 @@ body {
   animation: vision-blink 2.6s steps(1, end) both;
 }
 
+.animatronic-death {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgba(4, 3, 3, 0.88);
+}
+
+.death-card {
+  width: min(100%, 32rem);
+  padding: clamp(1.5rem, 5vw, 3rem);
+  border: 1px solid rgba(174, 57, 45, 0.8);
+  background: radial-gradient(ellipse at 50% 0%, rgba(99, 15, 14, 0.32), transparent 70%), #090706;
+  color: #f5e9ce;
+  text-align: center;
+  box-shadow: 0 0 3rem rgba(95, 0, 0, 0.35);
+}
+
+.death-kicker {
+  margin: 0;
+  color: #b66e60;
+  font: 0.8rem monospace;
+  letter-spacing: 0.2em;
+}
+
+.death-card h2 {
+  margin: 0.7rem 0;
+  color: #fff1df;
+  font-family: "Volter Goldfish", sans-serif;
+  font-size: clamp(2.8rem, 12vw, 5rem);
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 20px rgba(166, 24, 18, 0.8);
+}
+
+.death-card p:not(.death-kicker) {
+  margin: 0 0 1.5rem;
+  font: 1rem/1.6 monospace;
+}
+
 @keyframes hit-flash {
   0% {
     opacity: 1;

@@ -5,9 +5,11 @@ const grassGame = document.getElementById('grass-game');
 const grassCanvas = document.getElementById('grass-canvas');
 const bloodOverlay = document.getElementById('blood-overlay');
 const visionBlink = document.getElementById('vision-blink');
+const animatronicDeath = document.getElementById('animatronic-death');
 const grassStatus = document.getElementById('grass-status');
 const grassControls = document.getElementById('grass-controls');
 const backButton = document.getElementById('back-button');
+const deathRestartButton = document.getElementById('death-restart');
 const characterVoice = new Audio('audio/casual-male-voice.mp3');
 characterVoice.preload = 'auto';
 const grabSound = new Audio('audio/grab-sound.mp3');
@@ -157,6 +159,7 @@ async function createGrassScene() {
   const [
     {
       ACESFilmicToneMapping,
+      AnimationMixer,
       BoxGeometry,
       Box3,
       BufferGeometry,
@@ -175,6 +178,7 @@ async function createGrassScene() {
       Mesh,
       MeshBasicMaterial,
       MeshStandardMaterial,
+      LoopRepeat,
       PerspectiveCamera,
       PlaneGeometry,
       PointLight,
@@ -345,12 +349,23 @@ async function createGrassScene() {
 
   let livingRoomPromise = null;
   const buildLivingRoom = async () => {
-    const [roomGltf, couchGltf, rifleGltf, tableGltf, monitorGltf, brickBaseColor] = await Promise.all([
+    const [
+      roomGltf,
+      couchGltf,
+      rifleGltf,
+      tableGltf,
+      monitorGltf,
+      sharkGltf,
+      teethGltf,
+      brickBaseColor
+    ] = await Promise.all([
       loadModel('living-room/scene.gltf'),
       loadModel('couch/scene.gltf'),
       loadModel('hunting-rifle/scene.gltf'),
       loadModel('pizzeria-table/scene.gltf'),
       loadModel('basic-pc-monitors/scene.gltf'),
+      loadModel('abandoned-animatronic/shark/scene.gltf'),
+      loadModel('abandoned-animatronic/teeth/scene.gltf'),
       new TextureLoader().loadAsync('brick-stack/brick-wall.jpg')
     ]);
     const roomScene = new Scene();
@@ -875,6 +890,58 @@ async function createGrassScene() {
     if (debris.instanceColor) debris.instanceColor.needsUpdate = true;
     destinationScene.add(debris);
 
+    const animatronicRoot = new Group();
+    animatronicRoot.name = 'shark animatronic with monster teeth';
+    animatronicRoot.position.set(0, 0, 4.8);
+    animatronicRoot.rotation.y = -Math.PI / 2;
+    const shark = sharkGltf.scene;
+    shark.updateMatrixWorld(true);
+    const sharkBounds = new Box3().setFromObject(shark);
+    const sharkSize = sharkBounds.getSize(new Vector3());
+    const sharkCenter = sharkBounds.getCenter(new Vector3());
+    const sharkScale = 4.2 / Math.max(sharkSize.x, sharkSize.y, sharkSize.z);
+    shark.scale.setScalar(sharkScale);
+    shark.position.set(
+      -sharkCenter.x * sharkScale,
+      -sharkBounds.min.y * sharkScale,
+      -sharkCenter.z * sharkScale
+    );
+    animatronicRoot.add(shark);
+
+    const teeth = teethGltf.scene;
+    teeth.updateMatrixWorld(true);
+    const teethBounds = new Box3().setFromObject(teeth);
+    const teethCenter = teethBounds.getCenter(new Vector3());
+    const teethSize = teethBounds.getSize(new Vector3());
+    const teethScale = 0.9 / Math.max(teethSize.x, teethSize.y, teethSize.z);
+    teeth.position.set(
+      -teethCenter.x,
+      -teethCenter.y,
+      -teethCenter.z
+    );
+    teeth.scale.setScalar(teethScale);
+    const teethJaw = new Group();
+    teethJaw.name = 'articulated monster-tooth jaw';
+    teethJaw.position.set(
+      -sharkSize.x * sharkScale * 0.39,
+      sharkSize.y * sharkScale * 0.38,
+      0
+    );
+    teethJaw.rotation.y = -Math.PI / 2;
+    teethJaw.add(teeth);
+    animatronicRoot.add(teethJaw);
+    destinationScene.add(animatronicRoot);
+
+    const sharkMixer = new AnimationMixer(shark);
+    const sharkAnimation = sharkGltf.animations[0];
+    if (sharkAnimation) {
+      sharkMixer.clipAction(sharkAnimation).setLoop(LoopRepeat, Infinity).play();
+    }
+
+    const animatronicGlow = new PointLight(0xb51f17, 1.4, 6, 2);
+    animatronicGlow.position.set(0, 1.4, 4.8);
+    destinationScene.add(animatronicGlow);
+
     const couch = couchGltf.scene;
     couch.updateMatrixWorld(true);
     const sourceCouchBounds = new Box3().setFromObject(couch);
@@ -925,6 +992,11 @@ async function createGrassScene() {
     let shotElapsed = null;
     let transportStartedAt = null;
     let destinationActive = false;
+    let animatronicGazeSeconds = 0;
+    let animatronicDeathStartedAt = null;
+    let animatronicDead = false;
+    const animatronicStartPosition = animatronicRoot.position.clone();
+    const animatronicLungeDirection = new Vector3();
     const techRoomDoors = [];
     const beginEncounter = () => {
       stopCharacterVoice();
@@ -939,6 +1011,11 @@ async function createGrassScene() {
       shotElapsed = null;
       transportStartedAt = null;
       destinationActive = false;
+      animatronicGazeSeconds = 0;
+      animatronicDeathStartedAt = null;
+      animatronicDead = false;
+      animatronicRoot.position.copy(animatronicStartPosition);
+      animatronicDeath.hidden = true;
       techRoomDoors.forEach((door) => {
         door.isOpen = false;
         door.hinge.rotation.y = 0;
@@ -948,6 +1025,71 @@ async function createGrassScene() {
       character.root.position.set(0, 0, encounterStartZ);
       grassStatus.textContent = 'He grabs you...';
       grassStatus.removeAttribute('data-error');
+    };
+    const updateAnimatronic = (delta, time) => {
+      sharkMixer.update(delta);
+      teethJaw.rotation.z = Math.sin(time * 0.004) * 0.14;
+      animatronicGlow.intensity = 1.1 + Math.sin(time * 0.006) * 0.3;
+      if (!destinationActive || animatronicDead) {
+        if (animatronicDeathStartedAt !== null) {
+          const lungeProgress = Math.min(1, (time - animatronicDeathStartedAt) / 420);
+          animatronicRoot.position
+            .copy(animatronicStartPosition)
+            .addScaledVector(animatronicLungeDirection, lungeProgress * 2.1);
+          if (time - animatronicDeathStartedAt >= 650 && animatronicDeath.hidden) {
+            animatronicDeath.hidden = false;
+            deathRestartButton.focus();
+          }
+        }
+        return;
+      }
+
+      grassScene.camera.updateMatrixWorld();
+      grassScene.gazeRaycaster.setFromCamera(grassScene.screenCenter, grassScene.camera);
+      const isLookingAtAnimatronic = grassScene.gazeRaycaster
+        .intersectObject(animatronicRoot, true)
+        .length > 0;
+      if (!isLookingAtAnimatronic) {
+        animatronicGazeSeconds = 0;
+        if (grassStatus.textContent.startsWith('It noticed you looking')) {
+          grassStatus.textContent = '';
+        }
+        return;
+      }
+
+      animatronicGazeSeconds += delta;
+      const countdown = Math.max(0, Math.ceil(0.9 - animatronicGazeSeconds));
+      grassStatus.textContent = countdown > 0
+        ? `It noticed you looking. Look away! ${countdown}`
+        : 'The shark animatronic lunges...';
+      if (animatronicGazeSeconds < 0.9) return;
+
+      animatronicDead = true;
+      animatronicDeathStartedAt = time;
+      animatronicLungeDirection
+        .set(
+          grassScene.camera.position.x - animatronicRoot.position.x,
+          0,
+          grassScene.camera.position.z - animatronicRoot.position.z
+        )
+        .normalize();
+      movementKeys.clear();
+    };
+    const respawnFromAnimatronic = () => {
+      animatronicDeath.hidden = true;
+      resetBleedingEffect();
+      animatronicGazeSeconds = 0;
+      animatronicDeathStartedAt = null;
+      animatronicDead = false;
+      animatronicRoot.position.copy(animatronicStartPosition);
+      destinationActive = true;
+      transportStartedAt = performance.now() - 3000;
+      movementKeys.clear();
+      grassScene.camera.position.set(-8, 1.65, -4);
+      cameraYaw = Math.PI;
+      cameraPitch = 0;
+      grassStatus.textContent = '';
+      grassControls.textContent = "WASD / arrows · drag to look · E opens doors · don't look at the shark";
     };
     const updateEncounter = (time) => {
       if (encounterStartTime === null) return 0;
@@ -963,7 +1105,7 @@ async function createGrassScene() {
         if (transportElapsed >= 2.6) {
           visionBlink.classList.remove('is-blinking');
           grassStatus.textContent = 'You wake up in the tech room.';
-          grassControls.textContent = 'WASD / arrows to move · drag to look · press E near a door to open it';
+          grassControls.textContent = "WASD / arrows · drag to look · E opens doors · don't look at the shark";
         }
         return 0;
       }
@@ -1151,10 +1293,15 @@ async function createGrassScene() {
       get isDestinationActive() {
         return destinationActive;
       },
+      get isPlayerDead() {
+        return animatronicDead;
+      },
       get characterPositionZ() {
         return character.root.position.z;
       },
-      updateEncounter
+      updateEncounter,
+      updateAnimatronic,
+      respawnFromAnimatronic
     };
   };
   const loadLivingRoom = () => {
@@ -1449,6 +1596,14 @@ function renderGrass(time) {
   }
 
   grassScene.camera.rotation.set(cameraPitch, cameraYaw, 0, 'YXZ');
+  if (isInDestination) {
+    grassScene.livingRoom.updateAnimatronic(delta, time);
+    if (grassScene.livingRoom.isPlayerDead) {
+      movementKeys.clear();
+      forward = 0;
+      strafe = 0;
+    }
+  }
   if (grassScene.livingRoom && !isInDestination) {
     const approach = Math.max(0, Math.min(1, (grassScene.livingRoom.characterPositionZ + 0.65) / 1.35));
     grassScene.camera.rotation.x += approach * 0.4;
@@ -1575,6 +1730,10 @@ playButton.addEventListener('click', async () => {
   }
 });
 
+deathRestartButton.addEventListener('click', () => {
+  grassScene?.livingRoom?.respawnFromAnimatronic();
+});
+
 backButton.addEventListener('click', () => {
   grassGame.hidden = true;
   menu.hidden = false;
@@ -1645,7 +1804,8 @@ window.addEventListener('keydown', (event) => {
   if (!movementCode) return;
 
   event.preventDefault();
-  if (grassScene?.livingRoom && !grassScene.livingRoom.isDestinationActive) return;
+  if (grassScene?.livingRoom
+    && (!grassScene.livingRoom.isDestinationActive || grassScene.livingRoom.isPlayerDead)) return;
   movementKeys.add(event.code);
 });
 

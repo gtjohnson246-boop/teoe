@@ -16,8 +16,8 @@
         }
       }
     </script>
-    <link rel="stylesheet" href="style.css?v=abandoned-kitchen-roof-1" />
-    <script src="script.js?v=abandoned-security-room-1" defer></script>
+    <link rel="stylesheet" href="style.css?v=shark-animatronic-1" />
+    <script src="script.js?v=shark-animatronic-1" defer></script>
   </head>
   <body>
     <main class="screen">
@@ -35,6 +35,14 @@
         <canvas id="grass-canvas" class="grass-canvas" aria-label="Three-dimensional grass model"></canvas>
         <div id="blood-overlay" class="blood-overlay" aria-hidden="true"></div>
         <div id="vision-blink" class="vision-blink" aria-hidden="true"></div>
+        <section id="animatronic-death" class="animatronic-death" role="dialog" aria-modal="true" aria-labelledby="death-title" hidden>
+          <div class="death-card">
+            <p class="death-kicker">ABANDONED BUILDING</p>
+            <h2 id="death-title">IT SAW YOU</h2>
+            <p>You looked straight at the shark. The old machine lunged before you could look away.</p>
+            <button id="death-restart" class="play-button" type="button">Wake up again</button>
+          </div>
+        </section>
         <p id="grass-status" class="grass-status" role="status" aria-live="polite"></p>
         <span class="grass-reticle" aria-hidden="true"></span>
         <p id="grass-controls" class="grass-controls">WASD / arrows to move · drag to look · keep the lamp in view for 3 seconds</p>
