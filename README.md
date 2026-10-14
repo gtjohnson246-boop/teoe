@@ -15,8 +15,8 @@ Browser version:
   `python3 -m http.server 8000`
 - Then visit: `http://localhost:8000`
 - The grass scene uses Three.js from a CDN, so an internet connection is needed when opening it for the first time.
-- In the grass field, use WASD or the arrow keys to move, and drag to turn the camera. Grass is rendered in view-cullable patches with lightweight cutout foliage and gentle wind.
-- Keep the lamp centered in view for three seconds to enter the furnished living room. You start seated on the couch and cannot move while sitting there, but you can still look around the room. A casual male character approaches, grabs you, and speaks using the bundled `audio/casual-male-voice.mp3` recording. Afterward, he raises a hunting rifle and shoots; a blood vignette signals that you are bleeding. Your vision blinks out and brings you to a walkable, ruined building assembled from the supplied brick-stack model.
+- In the grass field, use WASD or the arrow keys to move, and drag to turn the camera. Grass is rendered in view-cullable patches with lightweight cutout foliage and gentle wind, with reduced foliage density and render resolution to improve performance.
+- Keep the lamp centered in view for three seconds to enter the furnished living room. You start seated on the couch and cannot move while sitting there, but you can still look around the room. A casual male character approaches, grabs you, and speaks using the bundled `audio/casual-male-voice.mp3` recording. Afterward, he raises a hunting rifle and shoots; a blood vignette signals that you are bleeding. Your vision blinks out and brings you to a walkable brick building made from lightweight, textured masonry, with a roof and doorway.
 
 GitHub Pages:
 - The site deploys from the `main` branch via the workflow in `.github/workflows/pages.yml`.

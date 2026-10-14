@@ -185,6 +185,7 @@ async function createGrassScene() {
       Scene,
       SRGBColorSpace,
       SphereGeometry,
+      TextureLoader,
       Vector2,
       Vector3,
       WebGLRenderer
@@ -213,7 +214,7 @@ async function createGrassScene() {
   }
 
   const renderer = new WebGLRenderer({ canvas: grassCanvas, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.35));
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.2;
@@ -341,11 +342,11 @@ async function createGrassScene() {
 
   let livingRoomPromise = null;
   const buildLivingRoom = async () => {
-    const [roomGltf, couchGltf, rifleGltf, brickStackGltf] = await Promise.all([
+    const [roomGltf, couchGltf, rifleGltf, brickBaseColor] = await Promise.all([
       loadModel('living-room/scene.gltf'),
       loadModel('couch/scene.gltf'),
       loadModel('hunting-rifle/scene.gltf'),
-      loadModel('brick-stack/scene.gltf')
+      new TextureLoader().loadAsync('brick-stack/brick-wall.jpg')
     ]);
     const roomScene = new Scene();
     roomScene.background = new Color(0x10131a);
@@ -396,29 +397,16 @@ async function createGrassScene() {
     buildingFloor.position.y = -0.08;
     destinationScene.add(buildingFloor);
 
-    brickStackGltf.scene.updateMatrixWorld(true);
-    let brickStackSource = null;
-    brickStackGltf.scene.traverse((object) => {
-      if (!brickStackSource && object.isMesh) brickStackSource = object;
+    brickBaseColor.colorSpace = SRGBColorSpace;
+    brickBaseColor.wrapS = RepeatWrapping;
+    brickBaseColor.wrapT = RepeatWrapping;
+    const brickGeometry = new BoxGeometry(1, 1, 1);
+    const brickMaterial = new MeshStandardMaterial({
+      color: 0xe6ded2,
+      map: brickBaseColor,
+      roughness: 0.98
     });
-    if (!brickStackSource) {
-      throw new Error('The brick stack model contains no usable mesh.');
-    }
-
-    const brickGeometry = brickStackSource.geometry.clone()
-      .applyMatrix4(brickStackSource.matrixWorld);
-    const brickBounds = new Box3().setFromBufferAttribute(brickGeometry.attributes.position);
-    const brickCenter = brickBounds.getCenter(new Vector3());
-    const brickSize = brickBounds.getSize(new Vector3());
-    brickGeometry.translate(-brickCenter.x, -brickCenter.y, -brickCenter.z);
-    brickGeometry.computeBoundingBox();
-    brickGeometry.computeBoundingSphere();
-    const brickMaterial = Array.isArray(brickStackSource.material)
-      ? brickStackSource.material.map((material) => material.clone())
-      : brickStackSource.material.clone();
-    for (const material of Array.isArray(brickMaterial) ? brickMaterial : [brickMaterial]) {
-      material.roughness = 0.98;
-    }
+    const brickSize = new Vector3(1, 1, 1);
 
     const wallBrick = (axis, plane, span, rows, openings) => {
       const placements = [];
@@ -436,9 +424,6 @@ async function createGrassScene() {
           const alongWall = -span / 2 + sectionWidth / 2
             + column * sectionWidth + (row % 2) * sectionWidth / 2;
           if (openings.some((opening) => opening(alongWall, row))) continue;
-          if (row >= 3 && random() < 0.17) continue;
-          if (row > 0 && random() < 0.025) continue;
-
           placements.push({
             x: axis === 'x' ? alongWall : plane,
             y: row * 0.76 + sectionHeight / 2,
@@ -472,27 +457,30 @@ async function createGrassScene() {
       destinationScene.add(wall);
     };
 
-    wallBrick('x', -6.25, 12.5, 5, [
-      (x, row) => Math.abs(x + 3.1) < 1.05 && row >= 2 && row <= 3
-    ]);
-    wallBrick('x', 6.25, 12.5, 5, [
-      (x, row) => Math.abs(x - 3.2) < 0.95 && row >= 2 && row <= 3
-    ]);
-    wallBrick('z', -6.25, 12.5, 5, [
-      (z, row) => Math.abs(z - 0.5) < 1.05 && row >= 2 && row <= 3
-    ]);
-    wallBrick('z', 6.25, 12.5, 5, [
-      (x, row) => (Math.abs(x) < 0.82 && row < 4)
-        || (Math.abs(x + 3.2) < 1.0 && row >= 2 && row <= 3)
+    wallBrick('x', -6.25, 12.5, 6, []);
+    wallBrick('x', 6.25, 12.5, 6, []);
+    wallBrick('z', -6.25, 12.5, 6, []);
+    wallBrick('z', 6.25, 12.5, 6, [
+      (x, row) => Math.abs(x - 0.5) < 0.9 && row < 4
     ]);
 
     const roofBeamMaterial = new MeshStandardMaterial({ color: 0x30271d, roughness: 1 });
-    for (const [z, lean] of [[-4.4, -0.04], [-1.6, 0.03], [2.9, -0.08]]) {
-      const beam = new Mesh(new BoxGeometry(5.2, 0.16, 0.19), roofBeamMaterial);
-      beam.position.set(0.3, 3.72 + lean, z);
-      beam.rotation.z = lean;
+    for (const z of [-4.2, 0, 4.2]) {
+      const beam = new Mesh(new BoxGeometry(12.5, 0.2, 0.22), roofBeamMaterial);
+      beam.position.set(0, 4.58, z);
       destinationScene.add(beam);
     }
+
+    const roofTexture = brickBaseColor.clone();
+    roofTexture.repeat.set(8, 8);
+    roofTexture.needsUpdate = true;
+    const roof = new Mesh(
+      new BoxGeometry(13, 0.42, 13),
+      new MeshStandardMaterial({ map: roofTexture, color: 0x9d9385, roughness: 1 })
+    );
+    roof.name = 'solid brick roof';
+    roof.position.y = 4.83;
+    destinationScene.add(roof);
 
     const debrisCount = 38;
     const debris = new InstancedMesh(brickGeometry, brickMaterial, debrisCount);
@@ -766,7 +754,7 @@ async function createGrassScene() {
     });
     return sources;
   });
-  const fieldRows = 68;
+  const fieldRows = 48;
   const spacing = 1.5;
   const positionsByVariant = variants.map(() => []);
 
@@ -869,9 +857,9 @@ async function createGrassScene() {
   const bladeScale = new Vector3();
   const greenPalette = [0x718c35, 0x819b3e, 0x96a949, 0x5e792d, 0xa0ad52];
   const bladeColors = greenPalette.map((color) => new Color(color));
-  const bladeChunkRows = 8;
+  const bladeChunkRows = 6;
   const bladeChunkCount = bladeChunkRows * bladeChunkRows;
-  const bladeCount = 20000;
+  const bladeCount = 8000;
   const bladesPerChunk = Array.from({ length: bladeChunkCount }, () => []);
 
   for (let index = 0; index < bladeCount; index += 1) {
