@@ -1070,13 +1070,16 @@ async function createGrassScene() {
         return;
       }
 
-      if (sharkSound.paused) {
+if (sharkSound.paused) {
+        console.log("Looking at shark! Attempting to play sound..."); // Debug check 1
         if (voiceAudioContext?.state === 'suspended') {
           void voiceAudioContext.resume();
         }
         sharkSound.currentTime = 0;
-        sharkSound.play().catch((error) => {
-          console.error('Could not play the shark sound:', error);
+        sharkSound.play().then(() => {
+          console.log("Shark sound played successfully!"); // Debug check 2
+        }).catch((error) => {
+          console.error('Could not play the shark sound:', error); // Debug check 3
         });
       }
 
