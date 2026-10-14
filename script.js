@@ -4,6 +4,7 @@ const playButton = document.getElementById('play-button');
 const grassGame = document.getElementById('grass-game');
 const grassCanvas = document.getElementById('grass-canvas');
 const bloodOverlay = document.getElementById('blood-overlay');
+const visionBlink = document.getElementById('vision-blink');
 const grassStatus = document.getElementById('grass-status');
 const grassControls = document.getElementById('grass-controls');
 const backButton = document.getElementById('back-button');
@@ -340,10 +341,11 @@ async function createGrassScene() {
 
   let livingRoomPromise = null;
   const buildLivingRoom = async () => {
-    const [roomGltf, couchGltf, rifleGltf] = await Promise.all([
+    const [roomGltf, couchGltf, rifleGltf, brickStackGltf] = await Promise.all([
       loadModel('living-room/scene.gltf'),
       loadModel('couch/scene.gltf'),
-      loadModel('hunting-rifle/scene.gltf')
+      loadModel('hunting-rifle/scene.gltf'),
+      loadModel('brick-stack/scene.gltf')
     ]);
     const roomScene = new Scene();
     roomScene.background = new Color(0x10131a);
@@ -374,6 +376,162 @@ async function createGrassScene() {
     roomScene.add(room);
     room.updateMatrixWorld(true);
     const roomBounds = new Box3().setFromObject(room);
+
+    const destinationScene = new Scene();
+    destinationScene.background = new Color(0x10120f);
+    destinationScene.fog = new Fog(0x171914, 11, 32);
+    destinationScene.add(new HemisphereLight(0x9ca9b2, 0x28211a, 1.05));
+
+    const brokenRoofLight = new DirectionalLight(0xb7c3c0, 0.9);
+    brokenRoofLight.position.set(-4, 8, 3);
+    destinationScene.add(brokenRoofLight);
+
+    const moonbeam = new PointLight(0xc2cbd2, 1.6, 11, 2);
+    moonbeam.position.set(-3.4, 2.8, -1.8);
+    destinationScene.add(moonbeam);
+
+    const concreteMaterial = new MeshStandardMaterial({ color: 0x45463e, roughness: 1 });
+    const buildingFloor = new Mesh(new PlaneGeometry(15, 15), concreteMaterial);
+    buildingFloor.rotation.x = -Math.PI / 2;
+    buildingFloor.position.y = -0.08;
+    destinationScene.add(buildingFloor);
+
+    brickStackGltf.scene.updateMatrixWorld(true);
+    let brickStackSource = null;
+    brickStackGltf.scene.traverse((object) => {
+      if (!brickStackSource && object.isMesh) brickStackSource = object;
+    });
+    if (!brickStackSource) {
+      throw new Error('The brick stack model contains no usable mesh.');
+    }
+
+    const brickGeometry = brickStackSource.geometry.clone()
+      .applyMatrix4(brickStackSource.matrixWorld);
+    const brickBounds = new Box3().setFromBufferAttribute(brickGeometry.attributes.position);
+    const brickCenter = brickBounds.getCenter(new Vector3());
+    const brickSize = brickBounds.getSize(new Vector3());
+    brickGeometry.translate(-brickCenter.x, -brickCenter.y, -brickCenter.z);
+    brickGeometry.computeBoundingBox();
+    brickGeometry.computeBoundingSphere();
+    const brickMaterial = Array.isArray(brickStackSource.material)
+      ? brickStackSource.material.map((material) => material.clone())
+      : brickStackSource.material.clone();
+    for (const material of Array.isArray(brickMaterial) ? brickMaterial : [brickMaterial]) {
+      material.roughness = 0.98;
+    }
+
+    const wallBrick = (axis, plane, span, rows, openings) => {
+      const placements = [];
+      const sectionWidth = 1.42;
+      const sectionHeight = 0.78;
+      const wallDepth = 0.5;
+      const columns = Math.ceil(span / sectionWidth) + 1;
+      const wallRotation = new Quaternion().setFromAxisAngle(
+        new Vector3(0, 1, 0),
+        axis === 'z' ? Math.PI / 2 : 0
+      );
+
+      for (let row = 0; row < rows; row += 1) {
+        for (let column = 0; column < columns; column += 1) {
+          const alongWall = -span / 2 + sectionWidth / 2
+            + column * sectionWidth + (row % 2) * sectionWidth / 2;
+          if (openings.some((opening) => opening(alongWall, row))) continue;
+          if (row >= 3 && random() < 0.17) continue;
+          if (row > 0 && random() < 0.025) continue;
+
+          placements.push({
+            x: axis === 'x' ? alongWall : plane,
+            y: row * 0.76 + sectionHeight / 2,
+            z: axis === 'z' ? alongWall : plane,
+            width: sectionWidth * (0.94 + random() * 0.1),
+            height: sectionHeight * (0.94 + random() * 0.1),
+            depth: wallDepth * (0.94 + random() * 0.1)
+          });
+        }
+      }
+
+      const wall = new InstancedMesh(brickGeometry, brickMaterial, placements.length);
+      wall.name = 'weathered brick wall';
+      wall.receiveShadow = true;
+      const position = new Vector3();
+      const scale = new Vector3();
+      const transform = new Matrix4();
+
+      placements.forEach((brick, index) => {
+        position.set(brick.x, brick.y, brick.z);
+        scale.set(
+          brick.width / brickSize.x,
+          brick.height / brickSize.y,
+          brick.depth / brickSize.z
+        );
+        transform.compose(position, wallRotation, scale);
+        wall.setMatrixAt(index, transform);
+      });
+
+      wall.instanceMatrix.needsUpdate = true;
+      destinationScene.add(wall);
+    };
+
+    wallBrick('x', -6.25, 12.5, 5, [
+      (x, row) => Math.abs(x + 3.1) < 1.05 && row >= 2 && row <= 3
+    ]);
+    wallBrick('x', 6.25, 12.5, 5, [
+      (x, row) => Math.abs(x - 3.2) < 0.95 && row >= 2 && row <= 3
+    ]);
+    wallBrick('z', -6.25, 12.5, 5, [
+      (z, row) => Math.abs(z - 0.5) < 1.05 && row >= 2 && row <= 3
+    ]);
+    wallBrick('z', 6.25, 12.5, 5, [
+      (x, row) => (Math.abs(x) < 0.82 && row < 4)
+        || (Math.abs(x + 3.2) < 1.0 && row >= 2 && row <= 3)
+    ]);
+
+    const roofBeamMaterial = new MeshStandardMaterial({ color: 0x30271d, roughness: 1 });
+    for (const [z, lean] of [[-4.4, -0.04], [-1.6, 0.03], [2.9, -0.08]]) {
+      const beam = new Mesh(new BoxGeometry(5.2, 0.16, 0.19), roofBeamMaterial);
+      beam.position.set(0.3, 3.72 + lean, z);
+      beam.rotation.z = lean;
+      destinationScene.add(beam);
+    }
+
+    const debrisCount = 38;
+    const debris = new InstancedMesh(brickGeometry, brickMaterial, debrisCount);
+    debris.name = 'fallen bricks and rubble';
+    const debrisPosition = new Vector3();
+    const debrisRotation = new Quaternion();
+    const debrisScale = new Vector3();
+    const debrisTransform = new Matrix4();
+    const debrisColor = new Color();
+    for (let index = 0; index < debrisCount; index += 1) {
+      let x = 0;
+      let z = 0;
+      do {
+        x = (random() - 0.5) * 11;
+        z = (random() - 0.5) * 11;
+      } while (Math.hypot(x, z - 4.5) < 1.7);
+
+      const width = 0.72 + random() * 0.55;
+      const height = 0.3 + random() * 0.34;
+      const depth = 0.32 + random() * 0.3;
+      debrisPosition.set(x, height / 2, z);
+      debrisRotation.setFromAxisAngle(new Vector3(0, 1, 0), random() * Math.PI);
+      debrisRotation.multiply(new Quaternion().setFromAxisAngle(
+        new Vector3(0, 0, 1),
+        (random() - 0.5) * 0.16
+      ));
+      debrisScale.set(
+        width / brickSize.x,
+        height / brickSize.y,
+        depth / brickSize.z
+      );
+      debrisTransform.compose(debrisPosition, debrisRotation, debrisScale);
+      debris.setMatrixAt(index, debrisTransform);
+      debrisColor.setHSL(0.015 + random() * 0.035, 0.28 + random() * 0.2, 0.2 + random() * 0.12);
+      debris.setColorAt(index, debrisColor);
+    }
+    debris.instanceMatrix.needsUpdate = true;
+    if (debris.instanceColor) debris.instanceColor.needsUpdate = true;
+    destinationScene.add(debris);
 
     const couch = couchGltf.scene;
     couch.updateMatrixWorld(true);
@@ -423,16 +581,21 @@ async function createGrassScene() {
     let grabSoundPlayed = false;
     let speechFinishedElapsed = null;
     let shotElapsed = null;
+    let transportStartedAt = null;
+    let destinationActive = false;
     const beginEncounter = () => {
       stopCharacterVoice();
       resetGrabSound();
       resetBleedingEffect();
+      visionBlink.classList.remove('is-blinking');
       encounterStartTime = performance.now();
       voiceStarted = false;
       voiceError = false;
       grabSoundPlayed = false;
       speechFinishedElapsed = null;
       shotElapsed = null;
+      transportStartedAt = null;
+      destinationActive = false;
       rifleGrip.visible = false;
       muzzleFlash.visible = false;
       character.root.position.set(0, 0, encounterStartZ);
@@ -441,6 +604,22 @@ async function createGrassScene() {
     };
     const updateEncounter = (time) => {
       if (encounterStartTime === null) return 0;
+      if (transportStartedAt !== null) {
+        const transportElapsed = (time - transportStartedAt) / 1000;
+        if (!destinationActive && transportElapsed >= 1.55) {
+          destinationActive = true;
+          movementKeys.clear();
+          grassScene.camera.position.set(0, 1.65, 4.5);
+          cameraYaw = 0;
+          cameraPitch = 0;
+        }
+        if (transportElapsed >= 2.6) {
+          visionBlink.classList.remove('is-blinking');
+          grassStatus.textContent = 'You wake up inside an abandoned brick building.';
+          grassControls.textContent = 'WASD / arrows to move · drag to look around the abandoned building';
+        }
+        return 0;
+      }
 
       const elapsed = Math.max(0, (time - encounterStartTime) / 1000);
       const approach = Math.max(0, Math.min(1, elapsed / 1.3));
@@ -534,6 +713,11 @@ async function createGrassScene() {
         grassStatus.textContent = 'You have been shot. You are bleeding...';
         showBleedingEffect();
         playShotSound();
+        transportStartedAt = time;
+        visionBlink.classList.remove('is-blinking');
+        void visionBlink.offsetWidth;
+        visionBlink.classList.add('is-blinking');
+        grassStatus.textContent = 'You have been shot. Your vision flickers...';
       }
 
       if (shotElapsed !== null && elapsed - shotElapsed >= 0.12) {
@@ -553,7 +737,12 @@ async function createGrassScene() {
       maxX: roomBounds.max.x - 0.25,
       minZ: roomBounds.min.z + 0.25,
       maxZ: roomBounds.max.z - 0.25,
+      destinationScene,
+      destinationBounds: { minX: -5.55, maxX: 5.55, minZ: -5.55, maxZ: 5.55 },
       beginEncounter,
+      get isDestinationActive() {
+        return destinationActive;
+      },
       get characterPositionZ() {
         return character.root.position.z;
       },
@@ -794,6 +983,8 @@ function renderGrass(time) {
 
   const delta = lastGrassFrame === 0 ? 0 : Math.min((time - lastGrassFrame) / 1000, 0.05);
   lastGrassFrame = time;
+  const grabIntensity = grassScene.livingRoom?.updateEncounter(time) ?? 0;
+  const isInDestination = grassScene.livingRoom?.isDestinationActive === true;
   let forward = Number(movementKeys.has('KeyW') || movementKeys.has('ArrowUp'))
     - Number(movementKeys.has('KeyS') || movementKeys.has('ArrowDown'));
   let strafe = Number(movementKeys.has('KeyD') || movementKeys.has('ArrowRight'))
@@ -802,8 +993,23 @@ function renderGrass(time) {
   const maxX = grassScene.livingRoom?.maxX ?? fieldHalfSize;
   const minZ = grassScene.livingRoom?.minZ ?? -fieldHalfSize;
   const maxZ = grassScene.livingRoom?.maxZ ?? fieldHalfSize;
-
-  if (grassScene.livingRoom) {
+  if (isInDestination) {
+    const bounds = grassScene.livingRoom.destinationBounds;
+    const length = Math.hypot(forward, strafe) || 1;
+    const speed = 4 * delta / length;
+    const forwardX = -Math.sin(cameraYaw);
+    const forwardZ = -Math.cos(cameraYaw);
+    const rightX = Math.cos(cameraYaw);
+    const rightZ = -Math.sin(cameraYaw);
+    grassScene.camera.position.x = Math.max(
+      bounds.minX,
+      Math.min(bounds.maxX, grassScene.camera.position.x + (forward * forwardX + strafe * rightX) * speed)
+    );
+    grassScene.camera.position.z = Math.max(
+      bounds.minZ,
+      Math.min(bounds.maxZ, grassScene.camera.position.z + (forward * forwardZ + strafe * rightZ) * speed)
+    );
+  } else if (grassScene.livingRoom) {
     movementKeys.clear();
     forward = 0;
     strafe = 0;
@@ -828,9 +1034,8 @@ function renderGrass(time) {
   }
 
   grassScene.camera.rotation.set(cameraPitch, cameraYaw, 0, 'YXZ');
-  if (grassScene.livingRoom) {
+  if (grassScene.livingRoom && !isInDestination) {
     const approach = Math.max(0, Math.min(1, (grassScene.livingRoom.characterPositionZ + 0.65) / 1.35));
-    const grabIntensity = grassScene.livingRoom.updateEncounter(time);
     grassScene.camera.rotation.x += approach * 0.4;
     grassScene.camera.position.x += Math.sin(time * 0.035) * grabIntensity * 0.045;
     grassScene.camera.position.y += (Math.sin(time * 0.027) - 0.5) * grabIntensity * 0.06;
@@ -895,7 +1100,10 @@ function renderGrass(time) {
       grassStatus.removeAttribute('data-error');
     }
   }
-  grassScene.renderer.render(grassScene.livingRoom?.scene ?? grassScene.scene, grassScene.camera);
+  const activeScene = isInDestination
+    ? grassScene.livingRoom.destinationScene
+    : grassScene.livingRoom?.scene ?? grassScene.scene;
+  grassScene.renderer.render(activeScene, grassScene.camera);
   grassAnimationFrame = requestAnimationFrame(renderGrass);
 }
 
@@ -956,6 +1164,7 @@ backButton.addEventListener('click', () => {
   grassGame.hidden = true;
   menu.hidden = false;
   stopCharacterVoice();
+  visionBlink.classList.remove('is-blinking');
   movementKeys.clear();
   lampGazeSeconds = 0;
   livingRoomLoadFailed = false;
@@ -1008,7 +1217,7 @@ window.addEventListener('keydown', (event) => {
   if (!movementCode) return;
 
   event.preventDefault();
-  if (grassScene?.livingRoom) return;
+  if (grassScene?.livingRoom && !grassScene.livingRoom.isDestinationActive) return;
   movementKeys.add(event.code);
 });
 

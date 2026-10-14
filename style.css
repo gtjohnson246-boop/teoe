@@ -165,6 +165,19 @@ body {
   opacity: 0.88;
 }
 
+.vision-blink {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  background: #030303;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.vision-blink.is-blinking {
+  animation: vision-blink 2.6s steps(1, end) both;
+}
+
 @keyframes hit-flash {
   0% {
     opacity: 1;
@@ -172,6 +185,31 @@ body {
 
   100% {
     opacity: 0.88;
+  }
+}
+
+@keyframes vision-blink {
+  0%,
+  7%,
+  19%,
+  29%,
+  41%,
+  50%,
+  71%,
+  81%,
+  100% {
+    opacity: 0;
+  }
+
+  8%,
+  18%,
+  30%,
+  40%,
+  51%,
+  70%,
+  82%,
+  88% {
+    opacity: 1;
   }
 }
 

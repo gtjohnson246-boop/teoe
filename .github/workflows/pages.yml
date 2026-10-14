@@ -29,7 +29,7 @@ jobs:
         run: |
           mkdir _site
           cp index.html style.css script.js casual-male.js skull-background.png Creepster-Regular.ttf Volter-Goldfish.ttf _site/
-          cp -R audio grass lamp couch living-room hunting-rifle freddie_single_camera_speedscan_gltf _site/
+          cp -R audio grass lamp couch living-room hunting-rifle brick-stack freddie_single_camera_speedscan_gltf _site/
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v3
         with:
