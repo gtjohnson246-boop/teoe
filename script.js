@@ -738,7 +738,7 @@ async function createGrassScene() {
     securitySignContext.textAlign = 'center';
     securitySignContext.fillStyle = '#c4cbb4';
     securitySignContext.font = 'bold 38px monospace';
-    securitySignContext.fillText('SECURITY ROOM', 256, 55);
+    securitySignContext.fillText('TECH ROOM', 256, 55);
     securitySignContext.fillStyle = '#b64b43';
     securitySignContext.font = 'bold 18px monospace';
     securitySignContext.fillText('CAMERA CONTROL', 256, 91);
@@ -925,6 +925,7 @@ async function createGrassScene() {
     let shotElapsed = null;
     let transportStartedAt = null;
     let destinationActive = false;
+    const techRoomDoors = [];
     const beginEncounter = () => {
       stopCharacterVoice();
       resetGrabSound();
@@ -938,6 +939,10 @@ async function createGrassScene() {
       shotElapsed = null;
       transportStartedAt = null;
       destinationActive = false;
+      techRoomDoors.forEach((door) => {
+        door.isOpen = false;
+        door.hinge.rotation.y = 0;
+      });
       rifleGrip.visible = false;
       muzzleFlash.visible = false;
       character.root.position.set(0, 0, encounterStartZ);
@@ -951,14 +956,14 @@ async function createGrassScene() {
         if (!destinationActive && transportElapsed >= 1.55) {
           destinationActive = true;
           movementKeys.clear();
-          grassScene.camera.position.set(0, 1.65, 4.5);
-          cameraYaw = 0;
+          grassScene.camera.position.set(-8, 1.65, -4);
+          cameraYaw = Math.PI;
           cameraPitch = 0;
         }
         if (transportElapsed >= 2.6) {
           visionBlink.classList.remove('is-blinking');
-          grassStatus.textContent = 'You wake up inside an abandoned brick building.';
-          grassControls.textContent = 'WASD / arrows to explore six rooms · drag to look around the building';
+          grassStatus.textContent = 'You wake up in the tech room.';
+          grassControls.textContent = 'WASD / arrows to move · drag to look · press E near a door to open it';
         }
         return 0;
       }
@@ -1078,6 +1083,45 @@ async function createGrassScene() {
       { axis: 'x', position: 4, doorways: [-4, 4] },
       { axis: 'z', position: 0, doorways: [-8, 0, 8] }
     ];
+    const addTechRoomDoor = (axis, position, center, hingeRotation) => {
+      const hinge = new Group();
+      hinge.name = 'tech-room exit door hinge';
+      if (axis === 'x') {
+        hinge.position.set(position, 0, center - 0.8);
+      } else {
+        hinge.position.set(center - 0.8, 0, position);
+      }
+
+      const doorPanel = new Mesh(
+        new BoxGeometry(axis === 'x' ? 0.14 : 1.6, 2.95, axis === 'x' ? 1.6 : 0.14),
+        new MeshStandardMaterial({ color: 0x493a2c, roughness: 0.96 })
+      );
+      doorPanel.name = 'weathered tech-room door';
+      doorPanel.position.set(axis === 'x' ? 0 : 0.8, 1.5, axis === 'x' ? 0.8 : 0);
+      hinge.add(doorPanel);
+      destinationScene.add(hinge);
+      techRoomDoors.push({ axis, position, center, hinge, hingeRotation, isOpen: false });
+    };
+    addTechRoomDoor('x', -4, -4, Math.PI / 2);
+    addTechRoomDoor('z', 0, -8, -Math.PI / 2);
+    const openNearbyTechRoomDoor = (x, z) => {
+      const nearbyDoor = techRoomDoors.find((door) =>
+        !door.isOpen && Math.hypot(x - (door.axis === 'x' ? door.position : door.center),
+          z - (door.axis === 'x' ? door.center : door.position)) < 2.2
+      );
+      if (!nearbyDoor) return false;
+
+      nearbyDoor.isOpen = true;
+      nearbyDoor.hinge.rotation.y = nearbyDoor.hingeRotation;
+      return true;
+    };
+    const isClosedTechRoomDoor = (axis, position, center) =>
+      techRoomDoors.some((door) =>
+        !door.isOpen
+        && door.axis === axis
+        && door.position === position
+        && Math.abs(door.center - center) < 0.01
+      );
     const canMoveTo = (fromX, fromZ, toX, toZ) => interiorWalls.every((wall) => {
       const from = wall.axis === 'x' ? fromX : fromZ;
       const to = wall.axis === 'x' ? toX : toZ;
@@ -1089,7 +1133,8 @@ async function createGrassScene() {
       if (!movingTowardWall || !reachesWall) return true;
 
       const openingPosition = wall.axis === 'x' ? toZ : toX;
-      return wall.doorways.some((center) => Math.abs(openingPosition - center) < 0.8);
+      const doorway = wall.doorways.find((center) => Math.abs(openingPosition - center) < 0.8);
+      return doorway !== undefined && !isClosedTechRoomDoor(wall.axis, wall.position, doorway);
     });
 
     return {
@@ -1101,6 +1146,7 @@ async function createGrassScene() {
       destinationScene,
       destinationBounds: { minX: -11.25, maxX: 11.25, minZ: -7.25, maxZ: 7.25 },
       canMoveTo,
+      openNearbyTechRoomDoor,
       beginEncounter,
       get isDestinationActive() {
         return destinationActive;
@@ -1582,6 +1628,19 @@ grassCanvas.addEventListener('pointercancel', stopLooking);
 
 window.addEventListener('keydown', (event) => {
   if (grassGame.hidden) return;
+  if (event.code === 'KeyE') {
+    if (!event.repeat && grassScene?.livingRoom?.isDestinationActive) {
+      event.preventDefault();
+      const openedDoor = grassScene.livingRoom.openNearbyTechRoomDoor(
+        grassScene.camera.position.x,
+        grassScene.camera.position.z
+      );
+      grassStatus.textContent = openedDoor
+        ? 'The tech-room door creaks open.'
+        : 'Move closer to a closed tech-room door to open it.';
+    }
+    return;
+  }
   const movementCode = /^(Key[WASD]|Arrow(?:Up|Down|Left|Right))$/.test(event.code);
   if (!movementCode) return;
 
