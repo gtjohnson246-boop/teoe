@@ -392,7 +392,7 @@ async function createGrassScene() {
     destinationScene.add(moonbeam);
 
     const concreteMaterial = new MeshStandardMaterial({ color: 0x45463e, roughness: 1 });
-    const buildingFloor = new Mesh(new PlaneGeometry(15, 15), concreteMaterial);
+    const buildingFloor = new Mesh(new PlaneGeometry(25, 17), concreteMaterial);
     buildingFloor.rotation.x = -Math.PI / 2;
     buildingFloor.position.y = -0.08;
     destinationScene.add(buildingFloor);
@@ -457,32 +457,83 @@ async function createGrassScene() {
       destinationScene.add(wall);
     };
 
-    wallBrick('x', -6.25, 12.5, 6, []);
-    wallBrick('x', 6.25, 12.5, 6, []);
-    wallBrick('z', -6.25, 12.5, 6, []);
-    wallBrick('z', 6.25, 12.5, 6, [
-      (x, row) => Math.abs(x - 0.5) < 0.9 && row < 4
+    wallBrick('x', -8, 24, 6, []);
+    wallBrick('x', 8, 24, 6, [
+      (x, row) => Math.abs(x) < 0.9 && row < 4
     ]);
+    wallBrick('z', -12, 16, 6, []);
+    wallBrick('z', 12, 16, 6, []);
+
+    const doorway = (...centers) => (position, row) =>
+      centers.some((center) => Math.abs(position - center) < 0.9) && row < 4;
+    wallBrick('z', -4, 16, 6, [doorway(-4, 4)]);
+    wallBrick('z', 4, 16, 6, [doorway(-4, 4)]);
+    wallBrick('x', 0, 24, 6, [doorway(-8, 0, 8)]);
+
+    const roomCenters = [
+      [-8, -4], [0, -4], [8, -4],
+      [-8, 4], [0, 4], [8, 4]
+    ];
+    const rugMaterials = [
+      0x51443a, 0x45483c, 0x51403b,
+      0x45423a, 0x4b4339, 0x41453c
+    ].map((color) => new MeshStandardMaterial({ color, roughness: 1 }));
+    roomCenters.forEach(([x, z], index) => {
+      const rug = new Mesh(
+        new BoxGeometry(3.6, 0.035, 4.2),
+        rugMaterials[index]
+      );
+      rug.name = `abandoned room ${index + 1} rug`;
+      rug.position.set(x, -0.06, z);
+      destinationScene.add(rug);
+
+      const roomLight = new PointLight(0xc1c7b3, 0.65, 8, 2);
+      roomLight.position.set(x, 3.1, z);
+      destinationScene.add(roomLight);
+    });
+
+    const woodMaterial = new MeshStandardMaterial({ color: 0x453629, roughness: 1 });
+    const fadedFabric = new MeshStandardMaterial({ color: 0x666151, roughness: 1 });
+    const furnishingBox = (name, size, position, material, rotationY = 0) => {
+      const furnishing = new Mesh(new BoxGeometry(...size), material);
+      furnishing.name = name;
+      furnishing.position.set(...position);
+      furnishing.rotation.y = rotationY;
+      destinationScene.add(furnishing);
+      return furnishing;
+    };
+
+    furnishingBox('collapsed bed frame', [2.6, 0.34, 3.4], [-9.3, 0.34, 4.4], woodMaterial);
+    furnishingBox('dusty mattress', [2.5, 0.24, 3.25], [-9.3, 0.63, 4.4], fadedFabric);
+    furnishingBox('dusty pillow', [1.25, 0.18, 0.72], [-9.3, 0.82, 5.45], fadedFabric);
+    furnishingBox('broken writing desk', [2.8, 0.18, 1.35], [2.2, 1.05, 5.9], woodMaterial);
+    furnishingBox('desk pedestal', [0.42, 1, 1.1], [1.15, 0.5, 5.9], woodMaterial);
+    furnishingBox('empty bookcase', [2.8, 2.7, 0.55], [9.7, 1.35, 6.7], woodMaterial);
+    furnishingBox('north room worktable', [2.7, 0.18, 1.5], [-9.4, 1.05, -6.1], woodMaterial);
+    furnishingBox('north room cabinet', [2, 1.8, 0.8], [1.8, 0.9, -6.7], woodMaterial);
+    furnishingBox('second collapsed bed frame', [2.6, 0.34, 3.4], [9.2, 0.34, -4.3], woodMaterial);
+    furnishingBox('second dusty mattress', [2.5, 0.24, 3.25], [9.2, 0.63, -4.3], fadedFabric);
+    furnishingBox('second dusty pillow', [1.25, 0.18, 0.72], [9.2, 0.82, -5.35], fadedFabric);
 
     const roofBeamMaterial = new MeshStandardMaterial({ color: 0x30271d, roughness: 1 });
-    for (const z of [-4.2, 0, 4.2]) {
-      const beam = new Mesh(new BoxGeometry(12.5, 0.2, 0.22), roofBeamMaterial);
+    for (const z of [-5.3, 0, 5.3]) {
+      const beam = new Mesh(new BoxGeometry(24, 0.2, 0.22), roofBeamMaterial);
       beam.position.set(0, 4.58, z);
       destinationScene.add(beam);
     }
 
     const roofTexture = brickBaseColor.clone();
-    roofTexture.repeat.set(8, 8);
+    roofTexture.repeat.set(16, 12);
     roofTexture.needsUpdate = true;
     const roof = new Mesh(
-      new BoxGeometry(13, 0.42, 13),
+      new BoxGeometry(25, 0.42, 17),
       new MeshStandardMaterial({ map: roofTexture, color: 0x9d9385, roughness: 1 })
     );
     roof.name = 'solid brick roof';
     roof.position.y = 4.83;
     destinationScene.add(roof);
 
-    const debrisCount = 38;
+    const debrisCount = 64;
     const debris = new InstancedMesh(brickGeometry, brickMaterial, debrisCount);
     debris.name = 'fallen bricks and rubble';
     const debrisPosition = new Vector3();
@@ -494,8 +545,8 @@ async function createGrassScene() {
       let x = 0;
       let z = 0;
       do {
-        x = (random() - 0.5) * 11;
-        z = (random() - 0.5) * 11;
+        x = (random() - 0.5) * 22;
+        z = (random() - 0.5) * 14;
       } while (Math.hypot(x, z - 4.5) < 1.7);
 
       const width = 0.72 + random() * 0.55;
@@ -604,7 +655,7 @@ async function createGrassScene() {
         if (transportElapsed >= 2.6) {
           visionBlink.classList.remove('is-blinking');
           grassStatus.textContent = 'You wake up inside an abandoned brick building.';
-          grassControls.textContent = 'WASD / arrows to move · drag to look around the abandoned building';
+          grassControls.textContent = 'WASD / arrows to explore six rooms · drag to look around the building';
         }
         return 0;
       }
@@ -719,6 +770,25 @@ async function createGrassScene() {
       return Math.max(impact, voiceIntensity, shotImpact);
     };
 
+    const interiorWalls = [
+      { axis: 'x', position: -4, doorways: [-4, 4] },
+      { axis: 'x', position: 4, doorways: [-4, 4] },
+      { axis: 'z', position: 0, doorways: [-8, 0, 8] }
+    ];
+    const canMoveTo = (fromX, fromZ, toX, toZ) => interiorWalls.every((wall) => {
+      const from = wall.axis === 'x' ? fromX : fromZ;
+      const to = wall.axis === 'x' ? toX : toZ;
+      const movingTowardWall = Math.abs(to - wall.position) < Math.abs(from - wall.position);
+      const reachesWall = Math.min(
+        Math.abs(from - wall.position),
+        Math.abs(to - wall.position)
+      ) < 0.3 || (from - wall.position) * (to - wall.position) < 0;
+      if (!movingTowardWall || !reachesWall) return true;
+
+      const openingPosition = wall.axis === 'x' ? toZ : toX;
+      return wall.doorways.some((center) => Math.abs(openingPosition - center) < 0.8);
+    });
+
     return {
       scene: roomScene,
       minX: roomBounds.min.x + 0.25,
@@ -726,7 +796,8 @@ async function createGrassScene() {
       minZ: roomBounds.min.z + 0.25,
       maxZ: roomBounds.max.z - 0.25,
       destinationScene,
-      destinationBounds: { minX: -5.55, maxX: 5.55, minZ: -5.55, maxZ: 5.55 },
+      destinationBounds: { minX: -11.25, maxX: 11.25, minZ: -7.25, maxZ: 7.25 },
+      canMoveTo,
       beginEncounter,
       get isDestinationActive() {
         return destinationActive;
@@ -989,14 +1060,21 @@ function renderGrass(time) {
     const forwardZ = -Math.cos(cameraYaw);
     const rightX = Math.cos(cameraYaw);
     const rightZ = -Math.sin(cameraYaw);
-    grassScene.camera.position.x = Math.max(
+    const nextX = Math.max(
       bounds.minX,
       Math.min(bounds.maxX, grassScene.camera.position.x + (forward * forwardX + strafe * rightX) * speed)
     );
-    grassScene.camera.position.z = Math.max(
+    const nextZ = Math.max(
       bounds.minZ,
       Math.min(bounds.maxZ, grassScene.camera.position.z + (forward * forwardZ + strafe * rightZ) * speed)
     );
+    const canMoveTo = grassScene.livingRoom.canMoveTo;
+    if (canMoveTo(grassScene.camera.position.x, grassScene.camera.position.z, nextX, grassScene.camera.position.z)) {
+      grassScene.camera.position.x = nextX;
+    }
+    if (canMoveTo(grassScene.camera.position.x, grassScene.camera.position.z, grassScene.camera.position.x, nextZ)) {
+      grassScene.camera.position.z = nextZ;
+    }
   } else if (grassScene.livingRoom) {
     movementKeys.clear();
     forward = 0;
