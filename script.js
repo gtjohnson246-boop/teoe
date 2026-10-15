@@ -896,13 +896,13 @@ async function createGrassScene() {
     if (debris.instanceColor) debris.instanceColor.needsUpdate = true;
     destinationScene.add(debris);
 
-    const animatronicRoot = new Group();
+   const animatronicRoot = new Group();
     animatronicRoot.name = 'shark animatronic with monster teeth';
     animatronicRoot.position.set(0, 0, 4.8);
-    // Set X back to 0 so it stays above the floor
-    animatronicRoot.rotation.x = 0; 
+    // Rotate -90 degrees on Z to lay it horizontal on its belly, then rotate Y to face front
+    animatronicRoot.rotation.x = 0;
     animatronicRoot.rotation.y = -Math.PI / 2;
-    animatronicRoot.rotation.z = Math.PI / 2; // Rotates the model upright on its belly
+    animatronicRoot.rotation.z = -Math.PI / 2;
 
     const shark = sharkGltf.scene;
     shark.updateMatrixWorld(true);
