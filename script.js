@@ -899,7 +899,9 @@ async function createGrassScene() {
     const animatronicRoot = new Group();
     animatronicRoot.name = 'shark animatronic with monster teeth';
     animatronicRoot.position.set(0, 0, 4.8);
-    animatronicRoot.rotation.y = -Math.PI / 2;
+// Example: Rotate on X axis to tip the model upright
+animatronicRoot.rotation.x = -Math.PI / 2; 
+animatronicRoot.rotation.y = -Math.PI / 2;
     const shark = sharkGltf.scene;
     shark.updateMatrixWorld(true);
     const sharkBounds = new Box3().setFromObject(shark);
