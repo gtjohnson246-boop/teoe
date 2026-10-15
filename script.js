@@ -899,9 +899,10 @@ async function createGrassScene() {
     const animatronicRoot = new Group();
     animatronicRoot.name = 'shark animatronic with monster teeth';
     animatronicRoot.position.set(0, 0, 4.8);
-// Example: Rotate on X axis to tip the model upright
-animatronicRoot.rotation.x = -Math.PI / 2; 
-animatronicRoot.rotation.y = -Math.PI / 2;
+    // Fixed Orientation: Standing right-side up
+    animatronicRoot.rotation.x = Math.PI;
+    animatronicRoot.rotation.y = -Math.PI / 2;
+
     const shark = sharkGltf.scene;
     shark.updateMatrixWorld(true);
     const sharkBounds = new Box3().setFromObject(shark);
@@ -1035,9 +1036,7 @@ animatronicRoot.rotation.y = -Math.PI / 2;
       grassStatus.removeAttribute('data-error');
     };
 
-    // ==========================================
-    // UPDATED SHARK ANIMATRONIC & AUDIO TRIGGER
-    // ==========================================
+    // Shark Animatronic & Audio Trigger
     const updateAnimatronic = (delta, time) => {
       sharkMixer.update(delta);
       teethJaw.rotation.z = Math.sin(time * 0.004) * 0.14;
