@@ -896,12 +896,14 @@ async function createGrassScene() {
     if (debris.instanceColor) debris.instanceColor.needsUpdate = true;
     destinationScene.add(debris);
 
-   const animatronicRoot = new Group();
+    const animatronicRoot = new Group();
     animatronicRoot.name = 'shark animatronic with monster teeth';
     animatronicRoot.position.set(0, 0.8, 4.8);
+    // Fixed Orientation: Standing upright on its belly
     animatronicRoot.rotation.x = 0;
     animatronicRoot.rotation.y = -Math.PI / 2;
     animatronicRoot.rotation.z = -Math.PI / 2;
+
     const shark = sharkGltf.scene;
     shark.updateMatrixWorld(true);
     const sharkBounds = new Box3().setFromObject(shark);
@@ -1035,7 +1037,7 @@ async function createGrassScene() {
       grassStatus.removeAttribute('data-error');
     };
 
-    // Shark Animatronic & Audio Trigger
+    // Shark Animatronic Movement & Audio Trigger
     const updateAnimatronic = (delta, time) => {
       sharkMixer.update(delta);
       teethJaw.rotation.z = Math.sin(time * 0.004) * 0.14;
@@ -1062,7 +1064,7 @@ async function createGrassScene() {
         .length > 0;
 
       if (isLookingAtAnimatronic) {
-        // Handle Shark Audio Playback
+        // Play shark sound when looked at
         if (sharkSound.paused) {
           if (voiceAudioContext?.state === 'suspended') {
             void voiceAudioContext.resume().catch(() => {});
@@ -1096,10 +1098,29 @@ async function createGrassScene() {
         if (grassStatus.textContent.startsWith('It noticed you looking')) {
           grassStatus.textContent = '';
         }
-        // Stop audio if player looks away
         if (!sharkSound.paused) {
           sharkSound.pause();
           sharkSound.currentTime = 0;
+        }
+
+        // --- SHARK MOVEMENT LOGIC ---
+        // Move toward player position when player looks away
+        const moveSpeed = 1.2 * delta;
+        const targetX = grassScene.camera.position.x;
+        const targetZ = grassScene.camera.position.z;
+        
+        const dx = targetX - animatronicRoot.position.x;
+        const dz = targetZ - animatronicRoot.position.z;
+        const distance = Math.hypot(dx, dz);
+
+        // Keep a minimum distance so it doesn't clip into camera before attack
+        if (distance > 1.2) {
+          animatronicRoot.position.x += (dx / distance) * moveSpeed;
+          animatronicRoot.position.z += (dz / distance) * moveSpeed;
+          
+          // Smoothly rotate shark to face the player while moving
+          const angle = Math.atan2(dx, dz);
+          animatronicRoot.rotation.y = angle - Math.PI / 2;
         }
       }
     };
