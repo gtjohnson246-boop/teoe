@@ -899,9 +899,10 @@ async function createGrassScene() {
     const animatronicRoot = new Group();
     animatronicRoot.name = 'shark animatronic with monster teeth';
     animatronicRoot.position.set(0, 0, 4.8);
-    // Fixed Orientation: Standing right-side up
-    animatronicRoot.rotation.x = Math.PI;
+    // Set X back to 0 so it stays above the floor
+    animatronicRoot.rotation.x = 0; 
     animatronicRoot.rotation.y = -Math.PI / 2;
+    animatronicRoot.rotation.z = Math.PI / 2; // Rotates the model upright on its belly
 
     const shark = sharkGltf.scene;
     shark.updateMatrixWorld(true);
