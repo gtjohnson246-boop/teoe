@@ -227,7 +227,8 @@ async function createGrassScene() {
   }
 
   const renderer = new WebGLRenderer({ canvas: grassCanvas, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.35));
+  // LAG FIX 1: Cap pixel ratio at 1.0 to reduce GPU load on high-DPI screens
+  renderer.setPixelRatio(1.0);
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.2;
@@ -463,7 +464,7 @@ async function createGrassScene() {
 
       const wall = new InstancedMesh(brickGeometry, brickMaterial, placements.length);
       wall.name = 'weathered brick wall';
-      wall.receiveShadow = true;
+      wall.receiveShadow = false;
       const position = new Vector3();
       const scale = new Vector3();
       const transform = new Matrix4();
@@ -899,7 +900,7 @@ async function createGrassScene() {
     const animatronicRoot = new Group();
     animatronicRoot.name = 'shark animatronic with monster teeth';
     animatronicRoot.position.set(0, 0.8, 4.8);
-    // Fixed Orientation: Standing upright on its belly
+    // Standing upright on its belly
     animatronicRoot.rotation.x = 0;
     animatronicRoot.rotation.y = -Math.PI / 2;
     animatronicRoot.rotation.z = -Math.PI / 2;
@@ -1417,7 +1418,7 @@ async function createGrassScene() {
       const plants = new InstancedMesh(source.geometry, cutoutMaterial, positions.length);
       plants.name = `${variant.name} field`;
       plants.castShadow = false;
-      plants.receiveShadow = true;
+      plants.receiveShadow = false;
       const sourceTransform = plantUpright.clone().multiply(source.matrixWorld);
 
       positions.forEach((position, index) => {
@@ -1477,7 +1478,8 @@ async function createGrassScene() {
   const bladeColors = greenPalette.map((color) => new Color(color));
   const bladeChunkRows = 6;
   const bladeChunkCount = bladeChunkRows * bladeChunkRows;
-  const bladeCount = 8000;
+  // LAG FIX 2: Lowered blade count from 8000 to 2500
+  const bladeCount = 2500;
   const bladesPerChunk = Array.from({ length: bladeChunkCount }, () => []);
 
   for (let index = 0; index < bladeCount; index += 1) {
