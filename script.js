@@ -898,12 +898,10 @@ async function createGrassScene() {
 
    const animatronicRoot = new Group();
     animatronicRoot.name = 'shark animatronic with monster teeth';
-    animatronicRoot.position.set(0, 0, 4.8);
-    // Rotate -90 degrees on Z to lay it horizontal on its belly, then rotate Y to face front
+    animatronicRoot.position.set(0, 0.8, 4.8);
     animatronicRoot.rotation.x = 0;
     animatronicRoot.rotation.y = -Math.PI / 2;
     animatronicRoot.rotation.z = -Math.PI / 2;
-
     const shark = sharkGltf.scene;
     shark.updateMatrixWorld(true);
     const sharkBounds = new Box3().setFromObject(shark);
