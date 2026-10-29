@@ -1072,7 +1072,6 @@ async function createGrassScene() {
       const distanceToPlayer = Math.hypot(dx, dz);
 
       // --- TOUCH COLLISION CHECK ---
-      // If shark touches player (gets closer than 1.3 units), trigger death
       if (distanceToPlayer < 1.3) {
         animatronicDead = true;
         animatronicDeathStartedAt = time;
@@ -1089,7 +1088,6 @@ async function createGrassScene() {
         .length > 0;
 
       if (isLookingAtAnimatronic) {
-        // Play shark sound when looked at
         if (sharkSound.paused) {
           if (voiceAudioContext?.state === 'suspended') {
             void voiceAudioContext.resume().catch(() => {});
@@ -1122,14 +1120,25 @@ async function createGrassScene() {
           sharkSound.currentTime = 0;
         }
 
-        // --- SHARK MOVEMENT LOGIC ---
-        // Move toward player position when player looks away
+        // --- SHARK MOVEMENT & COLLISION LOGIC ---
         const moveSpeed = 1.2 * delta;
-        
-        animatronicRoot.position.x += (dx / distanceToPlayer) * moveSpeed;
-        animatronicRoot.position.z += (dz / distanceToPlayer) * moveSpeed;
-        
-        // Smoothly rotate shark to face player while stalking
+        const stepX = (dx / distanceToPlayer) * moveSpeed;
+        const stepZ = (dz / distanceToPlayer) * moveSpeed;
+
+        const currentX = animatronicRoot.position.x;
+        const currentZ = animatronicRoot.position.z;
+        const nextX = currentX + stepX;
+        const nextZ = currentZ + stepZ;
+
+        // Verify if next step crosses a wall or closed door using canMoveTo
+        if (canMoveTo(currentX, currentZ, nextX, currentZ)) {
+          animatronicRoot.position.x = nextX;
+        }
+        if (canMoveTo(currentX, currentZ, currentX, nextZ)) {
+          animatronicRoot.position.z = nextZ;
+        }
+
+        // Rotate shark to face the direction it's moving
         const angle = Math.atan2(dx, dz);
         animatronicRoot.rotation.y = angle - Math.PI / 2;
       }
@@ -1286,25 +1295,52 @@ async function createGrassScene() {
       { axis: 'x', position: 4, doorways: [-4, 4] },
       { axis: 'z', position: 0, doorways: [-8, 0, 8] }
     ];
+
+    // DETAILED DOOR WITH FRAME AND HANDLE
     const addTechRoomDoor = (axis, position, center, hingeRotation) => {
       const hinge = new Group();
       hinge.name = 'tech-room exit door hinge';
+
       if (axis === 'x') {
         hinge.position.set(position, 0, center - 0.8);
       } else {
         hinge.position.set(center - 0.8, 0, position);
       }
 
+      const frameMaterial = new MeshStandardMaterial({ color: 0x2b2118, roughness: 0.9 });
+      const frameThickness = 0.12;
+      const doorWidth = 1.6;
+      const doorHeight = 2.95;
+
+      const topFrame = new Mesh(
+        new BoxGeometry(axis === 'x' ? 0.2 : doorWidth + 0.2, frameThickness, axis === 'x' ? doorWidth + 0.2 : 0.2),
+        frameMaterial
+      );
+      topFrame.position.set(axis === 'x' ? 0 : doorWidth / 2, doorHeight + frameThickness / 2, axis === 'x' ? doorWidth / 2 : 0);
+      hinge.add(topFrame);
+
+      const doorMaterial = new MeshStandardMaterial({ color: 0x5a4331, roughness: 0.8 });
       const doorPanel = new Mesh(
-        new BoxGeometry(axis === 'x' ? 0.14 : 1.6, 2.95, axis === 'x' ? 1.6 : 0.14),
-        new MeshStandardMaterial({ color: 0x493a2c, roughness: 0.96 })
+        new BoxGeometry(axis === 'x' ? 0.12 : doorWidth, doorHeight, axis === 'x' ? doorWidth : 0.12),
+        doorMaterial
       );
       doorPanel.name = 'weathered tech-room door';
-      doorPanel.position.set(axis === 'x' ? 0 : 0.8, 1.5, axis === 'x' ? 0.8 : 0);
+      doorPanel.position.set(axis === 'x' ? 0 : doorWidth / 2, doorHeight / 2, axis === 'x' ? doorWidth / 2 : 0);
       hinge.add(doorPanel);
+
+      const handleMaterial = new MeshStandardMaterial({ color: 0x8a7343, roughness: 0.4, metalness: 0.8 });
+      const handleKnob = new Mesh(new SphereGeometry(0.06, 12, 12), handleMaterial);
+      handleKnob.position.set(
+        axis === 'x' ? 0.12 : doorWidth - 0.2,
+        1.3,
+        axis === 'x' ? doorWidth - 0.2 : 0.12
+      );
+      hinge.add(handleKnob);
+
       destinationScene.add(hinge);
       techRoomDoors.push({ axis, position, center, hinge, hingeRotation, isOpen: false });
     };
+
     addTechRoomDoor('x', -4, -4, Math.PI / 2);
     addTechRoomDoor('z', 0, -8, -Math.PI / 2);
 
@@ -1328,6 +1364,7 @@ async function createGrassScene() {
         && door.position === position
         && Math.abs(door.center - center) < 0.01
       );
+
     const canMoveTo = (fromX, fromZ, toX, toZ) => interiorWalls.every((wall) => {
       const from = wall.axis === 'x' ? fromX : fromZ;
       const to = wall.axis === 'x' ? toX : toZ;
@@ -1368,6 +1405,7 @@ async function createGrassScene() {
       respawnFromAnimatronic
     };
   };
+
   const loadLivingRoom = () => {
     if (!livingRoomPromise) {
       livingRoomPromise = buildLivingRoom().catch((error) => {
