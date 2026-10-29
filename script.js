@@ -227,7 +227,7 @@ async function createGrassScene() {
   }
 
   const renderer = new WebGLRenderer({ canvas: grassCanvas, antialias: true });
-  // LAG FIX 1: Cap pixel ratio at 1.0 to reduce GPU load on high-DPI screens
+  // LAG FIX 1: Cap pixel ratio at 1.0 to reduce GPU load on high-DPI displays
   renderer.setPixelRatio(1.0);
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = ACESFilmicToneMapping;
@@ -465,6 +465,7 @@ async function createGrassScene() {
       const wall = new InstancedMesh(brickGeometry, brickMaterial, placements.length);
       wall.name = 'weathered brick wall';
       wall.receiveShadow = false;
+      wall.matrixAutoUpdate = false;
       const position = new Vector3();
       const scale = new Vector3();
       const transform = new Matrix4();
@@ -518,7 +519,8 @@ async function createGrassScene() {
         destinationScene.add(rug);
       }
 
-      const roomLight = new PointLight(0xc1c7b3, 0.65, 8, 2);
+      // LAG FIX 3: Lower light distance and intensity for performance
+      const roomLight = new PointLight(0xc1c7b3, 0.45, 6, 2);
       roomLight.position.set(x, 3.1, z);
       destinationScene.add(roomLight);
     });
@@ -527,6 +529,7 @@ async function createGrassScene() {
     const tileMaterial = new MeshStandardMaterial({ color: 0xffffff, roughness: 0.82 });
     const partyFloor = new InstancedMesh(tileGeometry, tileMaterial, 64);
     partyFloor.name = 'red and cream party-room checkerboard';
+    partyFloor.matrixAutoUpdate = false;
     const tilePosition = new Vector3();
     const tileRotation = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), -Math.PI / 2);
     const tileScale = new Vector3(1, 1, 1);
@@ -820,6 +823,7 @@ async function createGrassScene() {
     for (const side of [-1, 1]) {
       const ribs = new InstancedMesh(roofRibGeometry, roofRibMaterial, 45);
       ribs.name = 'raised seams on corrugated roof';
+      ribs.matrixAutoUpdate = false;
       for (let index = 0; index < 45; index += 1) {
         const x = -12 + index * (24 / 44);
         const position = new Vector3(x, roofCenterY + 0.09, side * roofSideCenter);
@@ -858,6 +862,7 @@ async function createGrassScene() {
     const debrisCount = 64;
     const debris = new InstancedMesh(brickGeometry, brickMaterial, debrisCount);
     debris.name = 'fallen bricks and rubble';
+    debris.matrixAutoUpdate = false;
     const debrisPosition = new Vector3();
     const debrisRotation = new Quaternion();
     const debrisScale = new Vector3();
@@ -900,7 +905,7 @@ async function createGrassScene() {
     const animatronicRoot = new Group();
     animatronicRoot.name = 'shark animatronic with monster teeth';
     animatronicRoot.position.set(0, 0.8, 4.8);
-    // Standing upright on its belly
+    // Fixed Orientation: Standing upright on its belly
     animatronicRoot.rotation.x = 0;
     animatronicRoot.rotation.y = -Math.PI / 2;
     animatronicRoot.rotation.z = -Math.PI / 2;
@@ -1038,7 +1043,7 @@ async function createGrassScene() {
       grassStatus.removeAttribute('data-error');
     };
 
-    // Shark Animatronic Movement & Audio Trigger
+    // Shark Animatronic Movement, Collision & Audio Trigger
     const updateAnimatronic = (delta, time) => {
       sharkMixer.update(delta);
       teethJaw.rotation.z = Math.sin(time * 0.004) * 0.14;
@@ -1055,6 +1060,22 @@ async function createGrassScene() {
             deathRestartButton.focus();
           }
         }
+        return;
+      }
+
+      // Calculate distance between player and shark
+      const dx = grassScene.camera.position.x - animatronicRoot.position.x;
+      const dz = grassScene.camera.position.z - animatronicRoot.position.z;
+      const distanceToPlayer = Math.hypot(dx, dz);
+
+      // --- TOUCH COLLISION CHECK ---
+      // If shark touches player (gets closer than 1.3 units), trigger death
+      if (distanceToPlayer < 1.3) {
+        animatronicDead = true;
+        animatronicDeathStartedAt = time;
+        animatronicLungeDirection.set(dx, 0, dz).normalize();
+        movementKeys.clear();
+        grassStatus.textContent = 'The shark caught you!';
         return;
       }
 
@@ -1085,13 +1106,7 @@ async function createGrassScene() {
         if (animatronicGazeSeconds >= 0.9) {
           animatronicDead = true;
           animatronicDeathStartedAt = time;
-          animatronicLungeDirection
-            .set(
-              grassScene.camera.position.x - animatronicRoot.position.x,
-              0,
-              grassScene.camera.position.z - animatronicRoot.position.z
-            )
-            .normalize();
+          animatronicLungeDirection.set(dx, 0, dz).normalize();
           movementKeys.clear();
         }
       } else {
@@ -1107,22 +1122,13 @@ async function createGrassScene() {
         // --- SHARK MOVEMENT LOGIC ---
         // Move toward player position when player looks away
         const moveSpeed = 1.2 * delta;
-        const targetX = grassScene.camera.position.x;
-        const targetZ = grassScene.camera.position.z;
         
-        const dx = targetX - animatronicRoot.position.x;
-        const dz = targetZ - animatronicRoot.position.z;
-        const distance = Math.hypot(dx, dz);
-
-        // Keep a minimum distance so it doesn't clip into camera before attack
-        if (distance > 1.2) {
-          animatronicRoot.position.x += (dx / distance) * moveSpeed;
-          animatronicRoot.position.z += (dz / distance) * moveSpeed;
-          
-          // Smoothly rotate shark to face the player while moving
-          const angle = Math.atan2(dx, dz);
-          animatronicRoot.rotation.y = angle - Math.PI / 2;
-        }
+        animatronicRoot.position.x += (dx / distanceToPlayer) * moveSpeed;
+        animatronicRoot.position.z += (dz / distanceToPlayer) * moveSpeed;
+        
+        // Smoothly rotate shark to face player while stalking
+        const angle = Math.atan2(dx, dz);
+        animatronicRoot.rotation.y = angle - Math.PI / 2;
       }
     };
 
@@ -1140,7 +1146,7 @@ async function createGrassScene() {
       cameraYaw = Math.PI;
       cameraPitch = 0;
       grassStatus.textContent = '';
-      grassControls.textContent = "WASD / arrows · drag to look · E opens doors · don't look at the shark";
+      grassControls.textContent = "WASD / arrows · drag to look · E opens/closes doors · don't look at the shark";
     };
 
     const updateEncounter = (time) => {
@@ -1157,7 +1163,7 @@ async function createGrassScene() {
         if (transportElapsed >= 2.6) {
           visionBlink.classList.remove('is-blinking');
           grassStatus.textContent = 'You wake up in the tech room.';
-          grassControls.textContent = "WASD / arrows · drag to look · E opens doors · don't look at the shark";
+          grassControls.textContent = "WASD / arrows · drag to look · E opens/closes doors · don't look at the shark";
         }
         return 0;
       }
@@ -1298,17 +1304,20 @@ async function createGrassScene() {
     };
     addTechRoomDoor('x', -4, -4, Math.PI / 2);
     addTechRoomDoor('z', 0, -8, -Math.PI / 2);
-    const openNearbyTechRoomDoor = (x, z) => {
+
+    // TOGGLE DOOR (OPEN / CLOSE)
+    const toggleNearbyTechRoomDoor = (x, z) => {
       const nearbyDoor = techRoomDoors.find((door) =>
-        !door.isOpen && Math.hypot(x - (door.axis === 'x' ? door.position : door.center),
+        Math.hypot(x - (door.axis === 'x' ? door.position : door.center),
           z - (door.axis === 'x' ? door.center : door.position)) < 2.2
       );
-      if (!nearbyDoor) return false;
+      if (!nearbyDoor) return { found: false };
 
-      nearbyDoor.isOpen = true;
-      nearbyDoor.hinge.rotation.y = nearbyDoor.hingeRotation;
-      return true;
+      nearbyDoor.isOpen = !nearbyDoor.isOpen;
+      nearbyDoor.hinge.rotation.y = nearbyDoor.isOpen ? nearbyDoor.hingeRotation : 0;
+      return { found: true, isOpen: nearbyDoor.isOpen };
     };
+
     const isClosedTechRoomDoor = (axis, position, center) =>
       techRoomDoors.some((door) =>
         !door.isOpen
@@ -1340,7 +1349,7 @@ async function createGrassScene() {
       destinationScene,
       destinationBounds: { minX: -11.25, maxX: 11.25, minZ: -7.25, maxZ: 7.25 },
       canMoveTo,
-      openNearbyTechRoomDoor,
+      toggleNearbyTechRoomDoor,
       beginEncounter,
       get isDestinationActive() {
         return destinationActive;
@@ -1478,7 +1487,7 @@ async function createGrassScene() {
   const bladeColors = greenPalette.map((color) => new Color(color));
   const bladeChunkRows = 6;
   const bladeChunkCount = bladeChunkRows * bladeChunkRows;
-  // LAG FIX 2: Lowered blade count from 8000 to 2500
+  // LAG FIX 2: Reduced blade count to 2500
   const bladeCount = 2500;
   const bladesPerChunk = Array.from({ length: bladeChunkCount }, () => []);
 
@@ -1843,13 +1852,17 @@ window.addEventListener('keydown', (event) => {
   if (event.code === 'KeyE') {
     if (!event.repeat && grassScene?.livingRoom?.isDestinationActive) {
       event.preventDefault();
-      const openedDoor = grassScene.livingRoom.openNearbyTechRoomDoor(
+      const result = grassScene.livingRoom.toggleNearbyTechRoomDoor(
         grassScene.camera.position.x,
         grassScene.camera.position.z
       );
-      grassStatus.textContent = openedDoor
-        ? 'The tech-room door creaks open.'
-        : 'Move closer to a closed tech-room door to open it.';
+      if (result.found) {
+        grassStatus.textContent = result.isOpen
+          ? 'The tech-room door creaks open.'
+          : 'The tech-room door shuts tightly.';
+      } else {
+        grassStatus.textContent = 'Move closer to a door to interact with it.';
+      }
     }
     return;
   }
