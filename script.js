@@ -11,6 +11,11 @@ const grassControls = document.getElementById('grass-controls');
 const backButton = document.getElementById('back-button');
 const deathRestartButton = document.getElementById('death-restart');
 
+// Passcode UI Elements
+const passcodeContainer = document.getElementById('passcode-container');
+const passcodeInput = document.getElementById('passcode-input');
+const passcodeError = document.getElementById('passcode-error');
+
 // Character & Grab Sounds
 const characterVoice = new Audio('audio/casual-male-voice.mp3');
 characterVoice.preload = 'auto';
@@ -227,7 +232,6 @@ async function createGrassScene() {
   }
 
   const renderer = new WebGLRenderer({ canvas: grassCanvas, antialias: true });
-  // LAG FIX 1: Cap pixel ratio at 1.0 to reduce GPU load on high-DPI displays
   renderer.setPixelRatio(1.0);
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = ACESFilmicToneMapping;
@@ -519,7 +523,6 @@ async function createGrassScene() {
         destinationScene.add(rug);
       }
 
-      // LAG FIX 3: Lower light distance and intensity for performance
       const roomLight = new PointLight(0xc1c7b3, 0.45, 6, 2);
       roomLight.position.set(x, 3.1, z);
       destinationScene.add(roomLight);
@@ -905,7 +908,7 @@ async function createGrassScene() {
     const animatronicRoot = new Group();
     animatronicRoot.name = 'shark animatronic with monster teeth';
     animatronicRoot.position.set(0, 0.8, 4.8);
-    // Fixed Orientation: Standing upright on its belly
+    // Standing upright on its belly
     animatronicRoot.rotation.x = 0;
     animatronicRoot.rotation.y = -Math.PI / 2;
     animatronicRoot.rotation.z = -Math.PI / 2;
@@ -1487,7 +1490,6 @@ async function createGrassScene() {
   const bladeColors = greenPalette.map((color) => new Color(color));
   const bladeChunkRows = 6;
   const bladeChunkCount = bladeChunkRows * bladeChunkRows;
-  // LAG FIX 2: Reduced blade count to 2500
   const bladeCount = 2500;
   const bladesPerChunk = Array.from({ length: bladeChunkCount }, () => []);
 
@@ -1747,7 +1749,16 @@ function startGrassScene() {
   }
 }
 
+// PASSCODE VERIFICATION (72303) ON PLAY BUTTON
 playButton.addEventListener('click', async () => {
+  if (passcodeInput && passcodeInput.value.trim() !== '72303') {
+    if (passcodeError) passcodeError.hidden = false;
+    passcodeInput.value = '';
+    passcodeInput.focus();
+    return;
+  }
+
+  if (passcodeError) passcodeError.hidden = true;
   unlockCharacterVoice();
   menu.hidden = true;
   grassGame.hidden = false;
@@ -1789,6 +1800,12 @@ playButton.addEventListener('click', async () => {
     grassStatus.dataset.error = 'true';
   } finally {
     grassLoading = false;
+  }
+});
+
+passcodeInput?.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    playButton.click();
   }
 });
 
