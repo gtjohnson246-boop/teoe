@@ -367,6 +367,7 @@ async function createGrassScene() {
       tableGltf,
       monitorGltf,
       sharkGltf,
+      diabolusRexGltf,
       teethGltf,
       brickBaseColor
     ] = await Promise.all([
@@ -376,6 +377,7 @@ async function createGrassScene() {
       loadModel('pizzeria-table/scene.gltf'),
       loadModel('basic-pc-monitors/scene.gltf'),
       loadModel('abandoned-animatronic/shark/scene.gltf'),
+      loadModel('diabolus-rex/scene.gltf'),
       loadModel('abandoned-animatronic/teeth/scene.gltf'),
       new TextureLoader().loadAsync('brick-stack/brick-wall.jpg')
     ]);
@@ -957,6 +959,34 @@ async function createGrassScene() {
       sharkMixer.clipAction(sharkAnimation).setLoop(LoopRepeat, Infinity).play();
     }
 
+    const diabolusRexRoot = new Group();
+    diabolusRexRoot.name = 'Diabolus Rex';
+    diabolusRexRoot.position.set(7.5, 0, 4.8);
+    const diabolusRex = diabolusRexGltf.scene;
+    diabolusRex.updateMatrixWorld(true);
+    const diabolusRexBounds = new Box3().setFromObject(diabolusRex);
+    const diabolusRexSize = diabolusRexBounds.getSize(new Vector3());
+    const diabolusRexCenter = diabolusRexBounds.getCenter(new Vector3());
+    const diabolusRexScale = 4.2 / Math.max(
+      diabolusRexSize.x,
+      diabolusRexSize.y,
+      diabolusRexSize.z
+    );
+    diabolusRex.scale.setScalar(diabolusRexScale);
+    diabolusRex.position.set(
+      -diabolusRexCenter.x * diabolusRexScale,
+      -diabolusRexBounds.min.y * diabolusRexScale,
+      -diabolusRexCenter.z * diabolusRexScale
+    );
+    diabolusRexRoot.add(diabolusRex);
+    destinationScene.add(diabolusRexRoot);
+
+    const diabolusRexMixer = new AnimationMixer(diabolusRex);
+    const diabolusRexAnimation = diabolusRexGltf.animations[0];
+    if (diabolusRexAnimation) {
+      diabolusRexMixer.clipAction(diabolusRexAnimation).setLoop(LoopRepeat, Infinity).play();
+    }
+
     const animatronicGlow = new PointLight(0xb51f17, 1.4, 6, 2);
     animatronicGlow.position.set(0, 1.4, 4.8);
     destinationScene.add(animatronicGlow);
@@ -1011,11 +1041,13 @@ async function createGrassScene() {
     let shotElapsed = null;
     let transportStartedAt = null;
     let destinationActive = false;
-    let animatronicGazeSeconds = 0;
     let animatronicDeathStartedAt = null;
     let animatronicDead = false;
     const animatronicStartPosition = animatronicRoot.position.clone();
+    const diabolusRexStartPosition = diabolusRexRoot.position.clone();
+    const animatronicDeathPosition = new Vector3();
     const animatronicLungeDirection = new Vector3();
+    let deathThreatRoot = null;
     const techRoomDoors = [];
     const beginEncounter = () => {
       stopCharacterVoice();
@@ -1030,10 +1062,11 @@ async function createGrassScene() {
       shotElapsed = null;
       transportStartedAt = null;
       destinationActive = false;
-      animatronicGazeSeconds = 0;
       animatronicDeathStartedAt = null;
       animatronicDead = false;
+      deathThreatRoot = null;
       animatronicRoot.position.copy(animatronicStartPosition);
+      diabolusRexRoot.position.copy(diabolusRexStartPosition);
       animatronicDeath.hidden = true;
       techRoomDoors.forEach((door) => {
         door.isOpen = false;
@@ -1046,17 +1079,65 @@ async function createGrassScene() {
       grassStatus.removeAttribute('data-error');
     };
 
-    // Shark Animatronic Movement, Collision & Audio Trigger
+    const killPlayerWithAnimatronic = (time, threatRoot) => {
+      animatronicDead = true;
+      animatronicDeathStartedAt = time;
+      deathThreatRoot = threatRoot;
+      animatronicDeathPosition.copy(threatRoot.position);
+      animatronicLungeDirection
+        .set(
+          grassScene.camera.position.x - threatRoot.position.x,
+          0,
+          grassScene.camera.position.z - threatRoot.position.z
+        )
+        .normalize();
+      movementKeys.clear();
+      grassStatus.textContent = 'It caught you!';
+    };
+
+    const updateDiabolusRex = (delta, time) => {
+      diabolusRexMixer.update(delta);
+      if (!destinationActive || animatronicDead) return;
+
+      const dx = grassScene.camera.position.x - diabolusRexRoot.position.x;
+      const dz = grassScene.camera.position.z - diabolusRexRoot.position.z;
+      let distance = Math.hypot(dx, dz);
+
+      if (distance > 1.2) {
+        const moveDistance = Math.min(1.2 * delta, distance);
+        const stepX = (dx / distance) * moveDistance;
+        const stepZ = (dz / distance) * moveDistance;
+        const currentX = diabolusRexRoot.position.x;
+        const currentZ = diabolusRexRoot.position.z;
+        if (canMoveTo(currentX, currentZ, currentX + stepX, currentZ)) {
+          diabolusRexRoot.position.x += stepX;
+        }
+        if (canMoveTo(currentX, currentZ, currentX, currentZ + stepZ)) {
+          diabolusRexRoot.position.z += stepZ;
+        }
+        diabolusRexRoot.rotation.y = Math.atan2(dx, dz) - Math.PI / 2;
+        distance = Math.hypot(
+          grassScene.camera.position.x - diabolusRexRoot.position.x,
+          grassScene.camera.position.z - diabolusRexRoot.position.z
+        );
+      }
+
+      if (distance <= 1.2) {
+        killPlayerWithAnimatronic(time, diabolusRexRoot);
+      }
+    };
+
     const updateAnimatronic = (delta, time) => {
       sharkMixer.update(delta);
+      updateDiabolusRex(delta, time);
       teethJaw.rotation.z = Math.sin(time * 0.004) * 0.14;
       animatronicGlow.intensity = 1.1 + Math.sin(time * 0.006) * 0.3;
 
       if (!destinationActive || animatronicDead) {
         if (animatronicDeathStartedAt !== null) {
           const lungeProgress = Math.min(1, (time - animatronicDeathStartedAt) / 420);
-          animatronicRoot.position
-            .copy(animatronicStartPosition)
+          deathThreatRoot.position
+            .copy(animatronicDeathPosition)
             .addScaledVector(animatronicLungeDirection, lungeProgress * 2.1);
           if (time - animatronicDeathStartedAt >= 650 && animatronicDeath.hidden) {
             animatronicDeath.hidden = false;
@@ -1071,13 +1152,8 @@ async function createGrassScene() {
       const dz = grassScene.camera.position.z - animatronicRoot.position.z;
       const distanceToPlayer = Math.hypot(dx, dz);
 
-      // --- TOUCH COLLISION CHECK ---
       if (distanceToPlayer < 1.3) {
-        animatronicDead = true;
-        animatronicDeathStartedAt = time;
-        animatronicLungeDirection.set(dx, 0, dz).normalize();
-        movementKeys.clear();
-        grassStatus.textContent = 'The shark caught you!';
+        killPlayerWithAnimatronic(time, animatronicRoot);
         return;
       }
 
@@ -1097,30 +1173,16 @@ async function createGrassScene() {
             console.warn('Shark audio playback error caught:', error);
           });
         }
-
-        animatronicGazeSeconds += delta;
-        const countdown = Math.max(0, Math.ceil(0.9 - animatronicGazeSeconds));
-        grassStatus.textContent = countdown > 0
-          ? `It noticed you looking. Look away! ${countdown}`
-          : 'The shark animatronic lunges...';
-
-        if (animatronicGazeSeconds >= 0.9) {
-          animatronicDead = true;
-          animatronicDeathStartedAt = time;
-          animatronicLungeDirection.set(dx, 0, dz).normalize();
-          movementKeys.clear();
-        }
+        killPlayerWithAnimatronic(time, animatronicRoot);
+        return;
       } else {
-        animatronicGazeSeconds = 0;
-        if (grassStatus.textContent.startsWith('It noticed you looking')) {
-          grassStatus.textContent = '';
-        }
         if (!sharkSound.paused) {
           sharkSound.pause();
           sharkSound.currentTime = 0;
         }
+      }
 
-        // --- SHARK MOVEMENT & COLLISION LOGIC ---
+      // Move the shark toward the player without crossing walls or closed doors.
         const moveSpeed = 1.2 * delta;
         const stepX = (dx / distanceToPlayer) * moveSpeed;
         const stepZ = (dz / distanceToPlayer) * moveSpeed;
@@ -1141,16 +1203,16 @@ async function createGrassScene() {
         // Rotate shark to face the direction it's moving
         const angle = Math.atan2(dx, dz);
         animatronicRoot.rotation.y = angle - Math.PI / 2;
-      }
     };
 
     const respawnFromAnimatronic = () => {
       animatronicDeath.hidden = true;
       resetBleedingEffect();
-      animatronicGazeSeconds = 0;
       animatronicDeathStartedAt = null;
       animatronicDead = false;
+      deathThreatRoot = null;
       animatronicRoot.position.copy(animatronicStartPosition);
+      diabolusRexRoot.position.copy(diabolusRexStartPosition);
       destinationActive = true;
       transportStartedAt = performance.now() - 3000;
       movementKeys.clear();
