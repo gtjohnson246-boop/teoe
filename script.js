@@ -232,7 +232,7 @@ async function createGrassScene() {
   }
 
   const renderer = new WebGLRenderer({ canvas: grassCanvas, antialias: true });
-  renderer.setPixelRatio(1.0);
+  renderer.setPixelRatio(0.75);
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.2;
