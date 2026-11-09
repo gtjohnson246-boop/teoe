@@ -1051,6 +1051,7 @@ async function createGrassScene() {
     let animatronicDead = false;
     const animatronicStartPosition = animatronicRoot.position.clone();
     const diabolusRexStartPosition = diabolusRexRoot.position.clone();
+    const diabolusRexStartRotationY = diabolusRexRoot.rotation.y;
     const animatronicDeathPosition = new Vector3();
     const animatronicLungeDirection = new Vector3();
     let deathThreatRoot = null;
@@ -1073,6 +1074,7 @@ async function createGrassScene() {
       deathThreatRoot = null;
       animatronicRoot.position.copy(animatronicStartPosition);
       diabolusRexRoot.position.copy(diabolusRexStartPosition);
+      diabolusRexRoot.rotation.y = diabolusRexStartRotationY;
       animatronicDeath.hidden = true;
       techRoomDoors.forEach((door) => {
         door.isOpen = false;
@@ -1108,6 +1110,16 @@ async function createGrassScene() {
       && Math.hypot(x - otherCreature.position.x, z - otherCreature.position.z)
         >= creatureMinimumSeparation;
 
+    const turnDiabolusRexToward = (directionX, directionZ, delta) => {
+      const targetYaw = Math.atan2(directionX, directionZ) - Math.PI / 2;
+      const yawDifference = Math.atan2(
+        Math.sin(targetYaw - diabolusRexRoot.rotation.y),
+        Math.cos(targetYaw - diabolusRexRoot.rotation.y)
+      );
+      const turnAmount = Math.min(Math.abs(yawDifference), 2.4 * delta);
+      diabolusRexRoot.rotation.y += Math.sign(yawDifference) * turnAmount;
+    };
+
     const updateDiabolusRex = (delta, time) => {
       diabolusRexMixer.update(delta);
       if (!destinationActive || animatronicDead) return;
@@ -1117,18 +1129,18 @@ async function createGrassScene() {
       let distance = Math.hypot(dx, dz);
 
       if (distance > 1.2) {
+        const startX = diabolusRexRoot.position.x;
+        const startZ = diabolusRexRoot.position.z;
         const moveDistance = Math.min(creatureMoveSpeed * delta, distance);
         const stepX = (dx / distance) * moveDistance;
         const stepZ = (dz / distance) * moveDistance;
-        const currentX = diabolusRexRoot.position.x;
-        const currentZ = diabolusRexRoot.position.z;
         if (canMoveCreatureTo(
           diabolusRexRoot,
           animatronicRoot,
-          currentX,
-          currentZ,
-          currentX + stepX,
-          currentZ
+          startX,
+          startZ,
+          startX + stepX,
+          startZ
         )) {
           diabolusRexRoot.position.x += stepX;
         }
@@ -1144,7 +1156,14 @@ async function createGrassScene() {
         )) {
           diabolusRexRoot.position.z += stepZ;
         }
-        diabolusRexRoot.rotation.y = Math.atan2(dx, dz) - Math.PI / 2;
+        const displacementX = diabolusRexRoot.position.x - startX;
+        const displacementZ = diabolusRexRoot.position.z - startZ;
+        const displacement = Math.hypot(displacementX, displacementZ);
+        turnDiabolusRexToward(
+          displacement > 0.0001 ? displacementX : dx,
+          displacement > 0.0001 ? displacementZ : dz,
+          delta
+        );
         distance = Math.hypot(
           grassScene.camera.position.x - diabolusRexRoot.position.x,
           grassScene.camera.position.z - diabolusRexRoot.position.z
@@ -1256,6 +1275,7 @@ async function createGrassScene() {
       deathThreatRoot = null;
       animatronicRoot.position.copy(animatronicStartPosition);
       diabolusRexRoot.position.copy(diabolusRexStartPosition);
+      diabolusRexRoot.rotation.y = diabolusRexStartRotationY;
       destinationActive = true;
       transportStartedAt = performance.now() - 3000;
       movementKeys.clear();
