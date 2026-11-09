@@ -956,12 +956,15 @@ async function createGrassScene() {
     const sharkMixer = new AnimationMixer(shark);
     const sharkAnimation = sharkGltf.animations[0];
     if (sharkAnimation) {
-      sharkMixer.clipAction(sharkAnimation).setLoop(LoopRepeat, Infinity).play();
+      sharkMixer.clipAction(sharkAnimation)
+        .setEffectiveTimeScale(0.75)
+        .setLoop(LoopRepeat, Infinity)
+        .play();
     }
 
     const diabolusRexRoot = new Group();
     diabolusRexRoot.name = 'Diabolus Rex';
-    diabolusRexRoot.position.set(7.5, 0, 4.8);
+    diabolusRexRoot.position.set(8, 0, -4.8);
     const diabolusRex = diabolusRexGltf.scene;
     diabolusRex.updateMatrixWorld(true);
     const diabolusRexBounds = new Box3().setFromObject(diabolusRex);
@@ -984,7 +987,10 @@ async function createGrassScene() {
     const diabolusRexMixer = new AnimationMixer(diabolusRex);
     const diabolusRexAnimation = diabolusRexGltf.animations[0];
     if (diabolusRexAnimation) {
-      diabolusRexMixer.clipAction(diabolusRexAnimation).setLoop(LoopRepeat, Infinity).play();
+      diabolusRexMixer.clipAction(diabolusRexAnimation)
+        .setEffectiveTimeScale(0.75)
+        .setLoop(LoopRepeat, Infinity)
+        .play();
     }
 
     const animatronicGlow = new PointLight(0xb51f17, 1.4, 6, 2);
@@ -1095,6 +1101,13 @@ async function createGrassScene() {
       grassStatus.textContent = 'It caught you!';
     };
 
+    const creatureMoveSpeed = 0.65;
+    const creatureMinimumSeparation = 4.5;
+    const canMoveCreatureTo = (creature, otherCreature, fromX, fromZ, x, z) =>
+      canMoveTo(fromX, fromZ, x, z)
+      && Math.hypot(x - otherCreature.position.x, z - otherCreature.position.z)
+        >= creatureMinimumSeparation;
+
     const updateDiabolusRex = (delta, time) => {
       diabolusRexMixer.update(delta);
       if (!destinationActive || animatronicDead) return;
@@ -1104,15 +1117,31 @@ async function createGrassScene() {
       let distance = Math.hypot(dx, dz);
 
       if (distance > 1.2) {
-        const moveDistance = Math.min(1.2 * delta, distance);
+        const moveDistance = Math.min(creatureMoveSpeed * delta, distance);
         const stepX = (dx / distance) * moveDistance;
         const stepZ = (dz / distance) * moveDistance;
         const currentX = diabolusRexRoot.position.x;
         const currentZ = diabolusRexRoot.position.z;
-        if (canMoveTo(currentX, currentZ, currentX + stepX, currentZ)) {
+        if (canMoveCreatureTo(
+          diabolusRexRoot,
+          animatronicRoot,
+          currentX,
+          currentZ,
+          currentX + stepX,
+          currentZ
+        )) {
           diabolusRexRoot.position.x += stepX;
         }
-        if (canMoveTo(currentX, currentZ, currentX, currentZ + stepZ)) {
+        const movedX = diabolusRexRoot.position.x;
+        const movedZ = diabolusRexRoot.position.z;
+        if (canMoveCreatureTo(
+          diabolusRexRoot,
+          animatronicRoot,
+          movedX,
+          movedZ,
+          movedX,
+          movedZ + stepZ
+        )) {
           diabolusRexRoot.position.z += stepZ;
         }
         diabolusRexRoot.rotation.y = Math.atan2(dx, dz) - Math.PI / 2;
@@ -1182,27 +1211,41 @@ async function createGrassScene() {
         }
       }
 
-      // Move the shark toward the player without crossing walls or closed doors.
-        const moveSpeed = 1.2 * delta;
-        const stepX = (dx / distanceToPlayer) * moveSpeed;
-        const stepZ = (dz / distanceToPlayer) * moveSpeed;
+      // Move the shark toward the player without crossing walls or crowding the rex.
+      const moveSpeed = Math.min(creatureMoveSpeed * delta, distanceToPlayer);
+      const stepX = (dx / distanceToPlayer) * moveSpeed;
+      const stepZ = (dz / distanceToPlayer) * moveSpeed;
 
-        const currentX = animatronicRoot.position.x;
-        const currentZ = animatronicRoot.position.z;
-        const nextX = currentX + stepX;
-        const nextZ = currentZ + stepZ;
+      const currentX = animatronicRoot.position.x;
+      const currentZ = animatronicRoot.position.z;
+      const nextX = currentX + stepX;
 
-        // Verify if next step crosses a wall or closed door using canMoveTo
-        if (canMoveTo(currentX, currentZ, nextX, currentZ)) {
-          animatronicRoot.position.x = nextX;
-        }
-        if (canMoveTo(currentX, currentZ, currentX, nextZ)) {
-          animatronicRoot.position.z = nextZ;
-        }
+      if (canMoveCreatureTo(
+        animatronicRoot,
+        diabolusRexRoot,
+        currentX,
+        currentZ,
+        nextX,
+        currentZ
+      )) {
+        animatronicRoot.position.x = nextX;
+      }
+      const movedX = animatronicRoot.position.x;
+      const movedZ = animatronicRoot.position.z;
+      if (canMoveCreatureTo(
+        animatronicRoot,
+        diabolusRexRoot,
+        movedX,
+        movedZ,
+        movedX,
+        movedZ + stepZ
+      )) {
+        animatronicRoot.position.z = movedZ + stepZ;
+      }
 
-        // Rotate shark to face the direction it's moving
-        const angle = Math.atan2(dx, dz);
-        animatronicRoot.rotation.y = angle - Math.PI / 2;
+      // Rotate shark to face the direction it's moving
+      const angle = Math.atan2(dx, dz);
+      animatronicRoot.rotation.y = angle - Math.PI / 2;
     };
 
     const respawnFromAnimatronic = () => {
@@ -1220,7 +1263,7 @@ async function createGrassScene() {
       cameraYaw = Math.PI;
       cameraPitch = 0;
       grassStatus.textContent = '';
-      grassControls.textContent = "WASD / arrows · drag to look · E opens/closes doors · don't look at the shark";
+      grassControls.textContent = "WASD / arrows · drag to look · E opens/closes doors · avoid both creatures";
     };
 
     const updateEncounter = (time) => {
@@ -1237,7 +1280,7 @@ async function createGrassScene() {
         if (transportElapsed >= 2.6) {
           visionBlink.classList.remove('is-blinking');
           grassStatus.textContent = 'You wake up in the tech room.';
-          grassControls.textContent = "WASD / arrows · drag to look · E opens/closes doors · don't look at the shark";
+          grassControls.textContent = "WASD / arrows · drag to look · E opens/closes doors · avoid both creatures";
         }
         return 0;
       }
