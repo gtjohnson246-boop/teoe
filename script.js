@@ -1103,21 +1103,146 @@ async function createGrassScene() {
       grassStatus.textContent = 'It caught you!';
     };
 
-    const creatureMoveSpeed = 0.65;
-    const creatureMinimumSeparation = 4.5;
+    const creatureMoveSpeed = 4.6;
+    const creatureMinimumSeparation = 2.6;
     const canMoveCreatureTo = (creature, otherCreature, fromX, fromZ, x, z) =>
       canMoveTo(fromX, fromZ, x, z)
       && Math.hypot(x - otherCreature.position.x, z - otherCreature.position.z)
         >= creatureMinimumSeparation;
 
-    const turnDiabolusRexToward = (directionX, directionZ, delta) => {
+    const turnCreatureToward = (creature, directionX, directionZ, delta) => {
       const targetYaw = Math.atan2(directionX, directionZ) - Math.PI / 2;
       const yawDifference = Math.atan2(
-        Math.sin(targetYaw - diabolusRexRoot.rotation.y),
-        Math.cos(targetYaw - diabolusRexRoot.rotation.y)
+        Math.sin(targetYaw - creature.rotation.y),
+        Math.cos(targetYaw - creature.rotation.y)
       );
       const turnAmount = Math.min(Math.abs(yawDifference), 2.4 * delta);
-      diabolusRexRoot.rotation.y += Math.sign(yawDifference) * turnAmount;
+      creature.rotation.y += Math.sign(yawDifference) * turnAmount;
+    };
+
+    const getRoomCell = (x, z) => ({
+      column: x < -4 ? 0 : x < 4 ? 1 : 2,
+      row: z < 0 ? 0 : 1
+    });
+
+    const getCreatureChaseTarget = (creature, targetX, targetZ) => {
+      const currentCell = getRoomCell(creature.position.x, creature.position.z);
+      const targetCell = getRoomCell(targetX, targetZ);
+      const currentRoom = currentCell.row * 3 + currentCell.column;
+      const targetRoom = targetCell.row * 3 + targetCell.column;
+      if (currentRoom === targetRoom) return { x: targetX, z: targetZ };
+
+      const queue = [currentRoom];
+      const previousRooms = new Map([[currentRoom, null]]);
+      const roomCenters = [-8, 0, 8];
+      while (queue.length > 0 && !previousRooms.has(targetRoom)) {
+        const room = queue.shift();
+        const column = room % 3;
+        const row = Math.floor(room / 3);
+        const neighbors = [];
+        if (column > 0) neighbors.push({
+          room: room - 1,
+          axis: 'x',
+          wallPosition: column === 1 ? -4 : 4,
+          doorwayCenter: row === 0 ? -4 : 4,
+          direction: -1
+        });
+        if (column < 2) neighbors.push({
+          room: room + 1,
+          axis: 'x',
+          wallPosition: column === 0 ? -4 : 4,
+          doorwayCenter: row === 0 ? -4 : 4,
+          direction: 1
+        });
+        if (row === 0) neighbors.push({
+          room: room + 3,
+          axis: 'z',
+          wallPosition: 0,
+          doorwayCenter: roomCenters[column],
+          direction: 1
+        });
+        if (row === 1) neighbors.push({
+          room: room - 3,
+          axis: 'z',
+          wallPosition: 0,
+          doorwayCenter: roomCenters[column],
+          direction: -1
+        });
+
+        neighbors.forEach((neighbor) => {
+          if (previousRooms.has(neighbor.room)
+            || isClosedTechRoomDoor(neighbor.axis, neighbor.wallPosition, neighbor.doorwayCenter)) {
+            return;
+          }
+          previousRooms.set(neighbor.room, { from: room, ...neighbor });
+          queue.push(neighbor.room);
+        });
+      }
+
+      const firstStep = [];
+      let room = targetRoom;
+      while (room !== currentRoom && previousRooms.has(room)) {
+        firstStep.unshift(previousRooms.get(room));
+        room = previousRooms.get(room).from;
+      }
+      const nextRoom = firstStep[0];
+      if (!nextRoom) return { x: targetX, z: targetZ };
+
+      if (nextRoom.axis === 'x') {
+        return {
+          x: nextRoom.wallPosition + nextRoom.direction * 0.7,
+          z: nextRoom.doorwayCenter
+        };
+      }
+      return {
+        x: nextRoom.doorwayCenter,
+        z: nextRoom.wallPosition + nextRoom.direction * 0.7
+      };
+    };
+
+    const moveCreatureToward = (creature, otherCreature, targetX, targetZ, delta) => {
+      const dx = targetX - creature.position.x;
+      const dz = targetZ - creature.position.z;
+      const distance = Math.hypot(dx, dz);
+      if (distance < 0.0001) return;
+
+      const moveDistance = Math.min(creatureMoveSpeed * delta, distance);
+      const stepX = (dx / distance) * moveDistance;
+      const stepZ = (dz / distance) * moveDistance;
+      const startX = creature.position.x;
+      const startZ = creature.position.z;
+      if (canMoveCreatureTo(
+        creature,
+        otherCreature,
+        startX,
+        startZ,
+        startX + stepX,
+        startZ
+      )) {
+        creature.position.x += stepX;
+      }
+      const movedX = creature.position.x;
+      const movedZ = creature.position.z;
+      if (canMoveCreatureTo(
+        creature,
+        otherCreature,
+        movedX,
+        movedZ,
+        movedX,
+        movedZ + stepZ
+      )) {
+        creature.position.z += stepZ;
+      }
+
+      const displacementX = creature.position.x - startX;
+      const displacementZ = creature.position.z - startZ;
+      const displacement = Math.hypot(displacementX, displacementZ);
+      turnCreatureToward(
+        creature,
+        displacement > 0.0001 ? displacementX : dx,
+        displacement > 0.0001 ? displacementZ : dz,
+        delta
+      );
     };
 
     const updateDiabolusRex = (delta, time) => {
@@ -1127,41 +1252,17 @@ async function createGrassScene() {
       const dx = grassScene.camera.position.x - diabolusRexRoot.position.x;
       const dz = grassScene.camera.position.z - diabolusRexRoot.position.z;
       let distance = Math.hypot(dx, dz);
-
       if (distance > 1.2) {
-        const startX = diabolusRexRoot.position.x;
-        const startZ = diabolusRexRoot.position.z;
-        const moveDistance = Math.min(creatureMoveSpeed * delta, distance);
-        const stepX = (dx / distance) * moveDistance;
-        const stepZ = (dz / distance) * moveDistance;
-        if (canMoveCreatureTo(
+        const chaseTarget = getCreatureChaseTarget(
+          diabolusRexRoot,
+          grassScene.camera.position.x,
+          grassScene.camera.position.z
+        );
+        moveCreatureToward(
           diabolusRexRoot,
           animatronicRoot,
-          startX,
-          startZ,
-          startX + stepX,
-          startZ
-        )) {
-          diabolusRexRoot.position.x += stepX;
-        }
-        const movedX = diabolusRexRoot.position.x;
-        const movedZ = diabolusRexRoot.position.z;
-        if (canMoveCreatureTo(
-          diabolusRexRoot,
-          animatronicRoot,
-          movedX,
-          movedZ,
-          movedX,
-          movedZ + stepZ
-        )) {
-          diabolusRexRoot.position.z += stepZ;
-        }
-        const displacementX = diabolusRexRoot.position.x - startX;
-        const displacementZ = diabolusRexRoot.position.z - startZ;
-        const displacement = Math.hypot(displacementX, displacementZ);
-        turnDiabolusRexToward(
-          displacement > 0.0001 ? displacementX : dx,
-          displacement > 0.0001 ? displacementZ : dz,
+          chaseTarget.x,
+          chaseTarget.z,
           delta
         );
         distance = Math.hypot(
@@ -1221,8 +1322,6 @@ async function createGrassScene() {
             console.warn('Shark audio playback error caught:', error);
           });
         }
-        killPlayerWithAnimatronic(time, animatronicRoot);
-        return;
       } else {
         if (!sharkSound.paused) {
           sharkSound.pause();
@@ -1230,41 +1329,18 @@ async function createGrassScene() {
         }
       }
 
-      // Move the shark toward the player without crossing walls or crowding the rex.
-      const moveSpeed = Math.min(creatureMoveSpeed * delta, distanceToPlayer);
-      const stepX = (dx / distanceToPlayer) * moveSpeed;
-      const stepZ = (dz / distanceToPlayer) * moveSpeed;
-
-      const currentX = animatronicRoot.position.x;
-      const currentZ = animatronicRoot.position.z;
-      const nextX = currentX + stepX;
-
-      if (canMoveCreatureTo(
+      const chaseTarget = getCreatureChaseTarget(
+        animatronicRoot,
+        grassScene.camera.position.x,
+        grassScene.camera.position.z
+      );
+      moveCreatureToward(
         animatronicRoot,
         diabolusRexRoot,
-        currentX,
-        currentZ,
-        nextX,
-        currentZ
-      )) {
-        animatronicRoot.position.x = nextX;
-      }
-      const movedX = animatronicRoot.position.x;
-      const movedZ = animatronicRoot.position.z;
-      if (canMoveCreatureTo(
-        animatronicRoot,
-        diabolusRexRoot,
-        movedX,
-        movedZ,
-        movedX,
-        movedZ + stepZ
-      )) {
-        animatronicRoot.position.z = movedZ + stepZ;
-      }
-
-      // Rotate shark to face the direction it's moving
-      const angle = Math.atan2(dx, dz);
-      animatronicRoot.rotation.y = angle - Math.PI / 2;
+        chaseTarget.x,
+        chaseTarget.z,
+        delta
+      );
     };
 
     const respawnFromAnimatronic = () => {
@@ -1533,10 +1609,16 @@ async function createGrassScene() {
 
   const loadLivingRoom = () => {
     if (!livingRoomPromise) {
-      livingRoomPromise = buildLivingRoom().catch((error) => {
-        livingRoomPromise = null;
-        throw error;
-      });
+      livingRoomPromise = buildLivingRoom()
+        .then(async (livingRoom) => {
+          await renderer.compileAsync(livingRoom.scene, camera);
+          await renderer.compileAsync(livingRoom.destinationScene, camera);
+          return livingRoom;
+        })
+        .catch((error) => {
+          livingRoomPromise = null;
+          throw error;
+        });
     }
     return livingRoomPromise;
   };
