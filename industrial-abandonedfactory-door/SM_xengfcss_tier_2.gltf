@@ -1,0 +1,228 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "Houdini GLTF 2.0 Exporter"
+  },
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5123,
+      "count": 28536,
+      "type": "SCALAR",
+      "min": [
+        0
+      ],
+      "max": [
+        28535
+      ]
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 28536,
+      "type": "VEC3",
+      "min": [
+        -63.20504,
+        -0.497373134,
+        -0.430046052
+      ],
+      "max": [
+        61.2220078,
+        249.921036,
+        9.12339687
+      ]
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 28536,
+      "type": "VEC2",
+      "min": [
+        0.001953125,
+        0.00651669502
+      ],
+      "max": [
+        0.998046875,
+        0.998041868
+      ]
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5126,
+      "count": 28536,
+      "type": "VEC3",
+      "min": [
+        -0.999997556,
+        -0.999999344,
+        -0.999489546
+      ],
+      "max": [
+        0.999998212,
+        0.999990046,
+        0.999999702
+      ]
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "SM_xengfcss_tier_2_data.bin",
+      "byteLength": 970224,
+      "name": "main_buffer"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 57072,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 57072,
+      "byteLength": 342432,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 399504,
+      "byteLength": 228288,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 627792,
+      "byteLength": 342432,
+      "target": 34962
+    }
+  ],
+  "nodes": [
+    {
+      "children": [
+        1
+      ],
+      "matrix": [
+        0.00999999978,
+        0,
+        0,
+        0,
+        0,
+        0.00999999978,
+        0,
+        0,
+        0,
+        0,
+        0.00999999978,
+        0,
+        0,
+        0,
+        0,
+        1
+      ],
+      "name": "world_root"
+    },
+    {
+      "name": "xengfcss_LOD0_TIER2_000",
+      "mesh": 0
+    }
+  ],
+  "meshes": [
+    {
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 3,
+            "TEXCOORD_0": 2,
+            "POSITION": 1
+          },
+          "indices": 0,
+          "material": 0
+        }
+      ],
+      "name": "xengfcss_LOD0_TIER2_000"
+    }
+  ],
+  "materials": [
+    {
+      "name": "MI_xengfcss",
+      "doubleSided": true,
+      "alphaMode": "OPAQUE",
+      "pbrMetallicRoughness": {
+        "metallicFactor": 1.0,
+        "roughnessFactor": 1.0,
+        "baseColorTexture": {
+          "index": 0,
+          "texCoord": 0
+        },
+        "metallicRoughnessTexture": {
+          "index": 2,
+          "texCoord": 0
+        }
+      },
+      "normalTexture": {
+        "index": 1,
+        "texCoord": 0
+      },
+      "occlusionTexture": {
+        "index": 2,
+        "texCoord": 0,
+        "strength": 1.0
+      }
+    }
+  ],
+  "scenes": [
+    {
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "scene": 0,
+  "images": [
+    {
+      "mimeType": "image/png",
+      "name": "T_xengfcss_2k_B",
+      "uri": "Textures/T_xengfcss_2k_B.png"
+    },
+    {
+      "mimeType": "image/png",
+      "name": "T_xengfcss_2k_N",
+      "uri": "Textures/T_xengfcss_2k_N.png"
+    },
+    {
+      "mimeType": "image/png",
+      "name": "T_xengfcss_2k_ORM",
+      "uri": "Textures/T_xengfcss_2k_ORM.png",
+      "extras": {
+        "compression": "mask"
+      }
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    },
+    {
+      "sampler": 0,
+      "source": 2
+    }
+  ],
+  "extras": {
+    "tier": 2,
+    "asset_id": "xengfcss",
+    "asset_type": "3d asset",
+    "name": "Industrial AbandonedFactory Door Double Metal M 01",
+    "resolution": "2048x2048",
+    "megacans_gltf_version": 2
+  },
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987
+    }
+  ]
+}

@@ -369,6 +369,7 @@ async function createGrassScene() {
       sharkGltf,
       diabolusRexGltf,
       teethGltf,
+      techRoomDoorGltf,
       brickBaseColor
     ] = await Promise.all([
       loadModel('living-room/scene.gltf'),
@@ -379,6 +380,7 @@ async function createGrassScene() {
       loadModel('abandoned-animatronic/shark/scene.gltf'),
       loadModel('diabolus-rex/scene.gltf'),
       loadModel('abandoned-animatronic/teeth/scene.gltf'),
+      loadModel('industrial-abandonedfactory-door/SM_xengfcss_tier_2.gltf'),
       new TextureLoader().loadAsync('brick-stack/brick-wall.jpg')
     ]);
     const roomScene = new Scene();
@@ -1508,35 +1510,22 @@ async function createGrassScene() {
         hinge.position.set(center - 0.8, 0, position);
       }
 
-      const frameMaterial = new MeshStandardMaterial({ color: 0x2b2118, roughness: 0.9 });
-      const frameThickness = 0.12;
-      const doorWidth = 1.6;
       const doorHeight = 2.95;
 
-      const topFrame = new Mesh(
-        new BoxGeometry(axis === 'x' ? 0.2 : doorWidth + 0.2, frameThickness, axis === 'x' ? doorWidth + 0.2 : 0.2),
-        frameMaterial
+      const doorModel = new Group();
+      doorModel.name = 'industrial double metal door';
+      const doorMesh = techRoomDoorGltf.scene.clone(true);
+      const modelBounds = new Box3().setFromObject(doorMesh);
+      const modelScale = doorHeight / modelBounds.getSize(new Vector3()).y;
+      doorMesh.scale.setScalar(modelScale);
+      doorMesh.position.set(
+        -modelBounds.min.x * modelScale,
+        -modelBounds.min.y * modelScale,
+        -modelBounds.getCenter(new Vector3()).z * modelScale
       );
-      topFrame.position.set(axis === 'x' ? 0 : doorWidth / 2, doorHeight + frameThickness / 2, axis === 'x' ? doorWidth / 2 : 0);
-      hinge.add(topFrame);
-
-      const doorMaterial = new MeshStandardMaterial({ color: 0x5a4331, roughness: 0.8 });
-      const doorPanel = new Mesh(
-        new BoxGeometry(axis === 'x' ? 0.12 : doorWidth, doorHeight, axis === 'x' ? doorWidth : 0.12),
-        doorMaterial
-      );
-      doorPanel.name = 'weathered tech-room door';
-      doorPanel.position.set(axis === 'x' ? 0 : doorWidth / 2, doorHeight / 2, axis === 'x' ? doorWidth / 2 : 0);
-      hinge.add(doorPanel);
-
-      const handleMaterial = new MeshStandardMaterial({ color: 0x8a7343, roughness: 0.4, metalness: 0.8 });
-      const handleKnob = new Mesh(new SphereGeometry(0.06, 12, 12), handleMaterial);
-      handleKnob.position.set(
-        axis === 'x' ? 0.12 : doorWidth - 0.2,
-        1.3,
-        axis === 'x' ? doorWidth - 0.2 : 0.12
-      );
-      hinge.add(handleKnob);
+      doorModel.rotation.y = axis === 'x' ? -Math.PI / 2 : 0;
+      doorModel.add(doorMesh);
+      hinge.add(doorModel);
 
       destinationScene.add(hinge);
       techRoomDoors.push({ axis, position, center, hinge, hingeRotation, isOpen: false });
