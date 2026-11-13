@@ -231,7 +231,11 @@ async function createGrassScene() {
     throw new Error('The grass model contains no usable plant variants.');
   }
 
-  const renderer = new WebGLRenderer({ canvas: grassCanvas, antialias: true });
+  const renderer = new WebGLRenderer({
+    canvas: grassCanvas,
+    antialias: false,
+    powerPreference: 'low-power'
+  });
   renderer.setPixelRatio(0.6);
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = ACESFilmicToneMapping;
