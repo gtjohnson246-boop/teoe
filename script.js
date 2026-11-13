@@ -11,7 +11,7 @@ const grassControls = document.getElementById('grass-controls');
 const backButton = document.getElementById('back-button');
 const deathRestartButton = document.getElementById('death-restart');
 const graphicsResetMessage = 'Graphics paused after a device reset. Waiting for recovery...';
-const grassPixelRatioLimit = 1.25;
+const grassPixelRatioLimit = 1;
 
 // Passcode UI Elements
 const passcodeContainer = document.getElementById('passcode-container');
@@ -264,7 +264,8 @@ async function createGrassScene() {
 
   const renderer = new WebGLRenderer({
     canvas: grassCanvas,
-    antialias: true
+    antialias: false,
+    powerPreference: 'low-power'
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, grassPixelRatioLimit));
   renderer.outputColorSpace = SRGBColorSpace;
