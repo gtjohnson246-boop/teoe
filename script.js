@@ -428,9 +428,9 @@ async function createGrassScene() {
     moonbeam.position.set(-3.4, 2.8, -1.8);
     destinationScene.add(moonbeam);
 
-    const roomSize = 8;
-    const roomColumnCenters = [-16, -8, 0, 8, 16];
-    const roomRowCenters = [-12, -4, 4, 12];
+    const roomSize = 12;
+    const roomColumnCenters = [-24, -12, 0, 12, 24];
+    const roomRowCenters = [-18, -6, 6, 18];
     const buildingHalfWidth = roomColumnCenters.length * roomSize / 2;
     const buildingHalfDepth = roomRowCenters.length * roomSize / 2;
     const concreteMaterial = new MeshStandardMaterial({ color: 0x45463e, roughness: 1 });
@@ -1566,8 +1566,8 @@ async function createGrassScene() {
       techRoomDoors.push({ axis, position, center, hinge, hingeRotation, isOpen: false });
     };
 
-    addTechRoomDoor('x', -4, -4, Math.PI / 2);
-    addTechRoomDoor('z', 0, -8, -Math.PI / 2);
+    addTechRoomDoor('x', -6, -6, Math.PI / 2);
+    addTechRoomDoor('z', 0, -12, -Math.PI / 2);
 
     // TOGGLE DOOR (OPEN / CLOSE)
     const toggleNearbyTechRoomDoor = (x, z) => {
@@ -1590,14 +1590,14 @@ async function createGrassScene() {
         && Math.abs(door.center - center) < 0.01
       );
 
-    const canMoveTo = (fromX, fromZ, toX, toZ) => interiorWalls.every((wall) => {
+    const canMoveTo = (fromX, fromZ, toX, toZ, wallClearance = 0.3) => interiorWalls.every((wall) => {
       const from = wall.axis === 'x' ? fromX : fromZ;
       const to = wall.axis === 'x' ? toX : toZ;
       const movingTowardWall = Math.abs(to - wall.position) < Math.abs(from - wall.position);
       const reachesWall = Math.min(
         Math.abs(from - wall.position),
         Math.abs(to - wall.position)
-      ) < 0.3 || (from - wall.position) * (to - wall.position) < 0;
+      ) < wallClearance || (from - wall.position) * (to - wall.position) < 0;
       if (!movingTowardWall || !reachesWall) return true;
 
       const openingPosition = wall.axis === 'x' ? toZ : toX;
@@ -1888,6 +1888,7 @@ function renderGrass(time) {
   const maxZ = grassScene.livingRoom?.maxZ ?? fieldHalfSize;
   if (isInDestination) {
     const bounds = grassScene.livingRoom.destinationBounds;
+    const wallClearance = 0.55;
     const length = Math.hypot(forward, strafe) || 1;
     const speed = 4 * delta / length;
     const forwardX = -Math.sin(cameraYaw);
@@ -1903,10 +1904,22 @@ function renderGrass(time) {
       Math.min(bounds.maxZ, grassScene.camera.position.z + (forward * forwardZ + strafe * rightZ) * speed)
     );
     const canMoveTo = grassScene.livingRoom.canMoveTo;
-    if (canMoveTo(grassScene.camera.position.x, grassScene.camera.position.z, nextX, grassScene.camera.position.z)) {
+    if (canMoveTo(
+      grassScene.camera.position.x,
+      grassScene.camera.position.z,
+      nextX,
+      grassScene.camera.position.z,
+      wallClearance
+    )) {
       grassScene.camera.position.x = nextX;
     }
-    if (canMoveTo(grassScene.camera.position.x, grassScene.camera.position.z, grassScene.camera.position.x, nextZ)) {
+    if (canMoveTo(
+      grassScene.camera.position.x,
+      grassScene.camera.position.z,
+      grassScene.camera.position.x,
+      nextZ,
+      wallClearance
+    )) {
       grassScene.camera.position.z = nextZ;
     }
   } else if (grassScene.livingRoom) {
