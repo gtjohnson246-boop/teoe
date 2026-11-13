@@ -237,10 +237,10 @@ async function createGrassScene() {
 
   const renderer = new WebGLRenderer({
     canvas: grassCanvas,
-    antialias: false,
+    antialias: true,
     powerPreference: 'low-power'
   });
-  renderer.setPixelRatio(0.6);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.2;
@@ -1876,10 +1876,15 @@ function renderGrass(time) {
   grassAnimationFrame = 0;
   if (grassGame.hidden || !grassScene) return;
 
+  const isInDestination = grassScene.livingRoom?.isDestinationActive === true;
+  if (isInDestination && lastGrassFrame !== 0 && time - lastGrassFrame < 1000 / 30) {
+    grassAnimationFrame = requestAnimationFrame(renderGrass);
+    return;
+  }
+
   const delta = lastGrassFrame === 0 ? 0 : Math.min((time - lastGrassFrame) / 1000, 0.05);
   lastGrassFrame = time;
   const grabIntensity = grassScene.livingRoom?.updateEncounter(time) ?? 0;
-  const isInDestination = grassScene.livingRoom?.isDestinationActive === true;
   let forward = Number(movementKeys.has('KeyW') || movementKeys.has('ArrowUp'))
     - Number(movementKeys.has('KeyS') || movementKeys.has('ArrowDown'));
   let strafe = Number(movementKeys.has('KeyD') || movementKeys.has('ArrowRight'))
