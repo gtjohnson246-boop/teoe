@@ -232,7 +232,7 @@ async function createGrassScene() {
   }
 
   const renderer = new WebGLRenderer({ canvas: grassCanvas, antialias: true });
-  renderer.setPixelRatio(0.75);
+  renderer.setPixelRatio(0.6);
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.2;
@@ -355,6 +355,8 @@ async function createGrassScene() {
   scene.add(lampLight);
   const gazeRaycaster = new Raycaster();
   const screenCenter = new Vector2(0, 0);
+  let lastAnimatronicLookCheck = -Infinity;
+  let isLookingAtAnimatronic = false;
   const encounterStartZ = -2.15;
   const encounterApproachDistance = 1.35;
 
@@ -426,8 +428,16 @@ async function createGrassScene() {
     moonbeam.position.set(-3.4, 2.8, -1.8);
     destinationScene.add(moonbeam);
 
+    const roomSize = 8;
+    const roomColumnCenters = [-16, -8, 0, 8, 16];
+    const roomRowCenters = [-12, -4, 4, 12];
+    const buildingHalfWidth = roomColumnCenters.length * roomSize / 2;
+    const buildingHalfDepth = roomRowCenters.length * roomSize / 2;
     const concreteMaterial = new MeshStandardMaterial({ color: 0x45463e, roughness: 1 });
-    const buildingFloor = new Mesh(new PlaneGeometry(25, 17), concreteMaterial);
+    const buildingFloor = new Mesh(
+      new PlaneGeometry(buildingHalfWidth * 2 + 1, buildingHalfDepth * 2 + 1),
+      concreteMaterial
+    );
     buildingFloor.rotation.x = -Math.PI / 2;
     buildingFloor.position.y = -0.08;
     destinationScene.add(buildingFloor);
@@ -493,31 +503,35 @@ async function createGrassScene() {
       destinationScene.add(wall);
     };
 
-    wallBrick('x', -8, 24, 6, []);
-    wallBrick('x', 8, 24, 6, [
-      (x, row) => Math.abs(x) < 0.9 && row < 4
-    ]);
+    wallBrick('x', -buildingHalfDepth, buildingHalfWidth * 2, 6, []);
+    wallBrick('x', buildingHalfDepth, buildingHalfWidth * 2, 6, []);
     const brokenWindowOpening = (position, row) =>
-      row >= 2 && row <= 4 && [-4, 4].some((center) => Math.abs(position - center) < 1.35);
-    wallBrick('z', -12, 16, 6, [brokenWindowOpening]);
-    wallBrick('z', 12, 16, 6, [brokenWindowOpening]);
+      row >= 2 && row <= 4 && roomRowCenters.some((center) => Math.abs(position - center) < 1.35);
+    wallBrick('z', -buildingHalfWidth, buildingHalfDepth * 2, 6, [brokenWindowOpening]);
+    wallBrick('z', buildingHalfWidth, buildingHalfDepth * 2, 6, [brokenWindowOpening]);
 
     const doorway = (...centers) => (position, row) =>
       centers.some((center) => Math.abs(position - center) < 0.9) && row < 4;
-    wallBrick('z', -4, 16, 6, [doorway(-4, 4)]);
-    wallBrick('z', 4, 16, 6, [doorway(-4, 4)]);
-    wallBrick('x', 0, 24, 6, [doorway(-8, 0, 8)]);
+    roomRowCenters.slice(0, -1).forEach((center) => {
+      wallBrick('x', center + roomSize / 2, buildingHalfWidth * 2, 6, [
+        doorway(...roomColumnCenters)
+      ]);
+    });
+    roomColumnCenters.slice(0, -1).forEach((center) => {
+      wallBrick('z', center + roomSize / 2, buildingHalfDepth * 2, 6, [
+        doorway(...roomRowCenters)
+      ]);
+    });
 
-    const roomCenters = [
-      [-8, -4], [0, -4], [8, -4],
-      [-8, 4], [0, 4], [8, 4]
-    ];
-    const rugMaterials = [
-      0x51443a, 0x45483c, 0x51403b,
-      0x45423a, 0x4b4339, 0x41453c
-    ].map((color) => new MeshStandardMaterial({ color, roughness: 1 }));
+    const roomCenters = roomRowCenters.flatMap((z) =>
+      roomColumnCenters.map((x) => [x, z])
+    );
+    const rugPalette = [0x51443a, 0x45483c, 0x51403b, 0x45423a, 0x4b4339, 0x41453c];
+    const rugMaterials = roomCenters.map((_, index) =>
+      new MeshStandardMaterial({ color: rugPalette[index % rugPalette.length], roughness: 1 })
+    );
     roomCenters.forEach(([x, z], index) => {
-      if (index !== 4) {
+      if (x !== 0 || z !== 4) {
         const rug = new Mesh(
           new BoxGeometry(3.6, 0.035, 4.2),
           rugMaterials[index]
@@ -527,9 +541,11 @@ async function createGrassScene() {
         destinationScene.add(rug);
       }
 
-      const roomLight = new PointLight(0xc1c7b3, 0.45, 6, 2);
-      roomLight.position.set(x, 3.1, z);
-      destinationScene.add(roomLight);
+      if (index % 2 === 0) {
+        const roomLight = new PointLight(0xc1c7b3, 0.45, 6, 2);
+        roomLight.position.set(x, 3.1, z);
+        destinationScene.add(roomLight);
+      }
     });
 
     const tileGeometry = new PlaneGeometry(0.96, 0.96);
@@ -575,15 +591,17 @@ async function createGrassScene() {
       opacity: 0.38
     });
     for (const side of [-1, 1]) {
-      for (const centerZ of [-4, 4]) {
-        furnishingBox('dark broken window recess', [0.12, 1.5, 2.35], [side * 11.98, 2.63, centerZ], windowGlassMaterial);
-        furnishingBox('splintered window sill', [0.24, 0.13, 2.9], [side * 11.78, 1.79, centerZ], windowFrameMaterial);
-        furnishingBox('weathered window lintel', [0.22, 0.14, 2.9], [side * 11.78, 3.48, centerZ], windowFrameMaterial);
+      for (const centerZ of roomRowCenters) {
+        const wallX = side * buildingHalfWidth;
+        const frameX = side * (buildingHalfWidth - 0.22);
+        furnishingBox('dark broken window recess', [0.12, 1.5, 2.35], [wallX, 2.63, centerZ], windowGlassMaterial);
+        furnishingBox('splintered window sill', [0.24, 0.13, 2.9], [frameX, 1.79, centerZ], windowFrameMaterial);
+        furnishingBox('weathered window lintel', [0.22, 0.14, 2.9], [frameX, 3.48, centerZ], windowFrameMaterial);
         for (const offset of [-1.34, 1.34]) {
-          furnishingBox('rotted window jamb', [0.22, 1.78, 0.14], [side * 11.78, 2.63, centerZ + offset], windowFrameMaterial);
+          furnishingBox('rotted window jamb', [0.22, 1.78, 0.14], [frameX, 2.63, centerZ + offset], windowFrameMaterial);
         }
-        furnishingBox('broken window crossbar', [0.18, 0.09, 2.55], [side * 11.78, 2.5, centerZ], windowFrameMaterial);
-        furnishingBox('loose window board', [0.14, 0.2, 1.45], [side * 11.76, 2.95, centerZ + 0.32], woodMaterial, side * 0.025);
+        furnishingBox('broken window crossbar', [0.18, 0.09, 2.55], [frameX, 2.5, centerZ], windowFrameMaterial);
+        furnishingBox('loose window board', [0.14, 0.2, 1.45], [side * (buildingHalfWidth - 0.24), 2.95, centerZ + 0.32], woodMaterial, side * 0.025);
       }
     }
 
@@ -794,32 +812,32 @@ async function createGrassScene() {
     furnishingBox('second dusty pillow', [1.25, 0.18, 0.72], [9.2, 0.82, -5.35], fadedFabric);
 
     const roofBeamMaterial = new MeshStandardMaterial({ color: 0x30271d, roughness: 1 });
-    const roofSheetGeometry = new BoxGeometry(3.99, 0.14, 8.78);
+    const roofHalfSpan = buildingHalfDepth + 0.72;
+    const roofSheetGeometry = new BoxGeometry(3.99, 0.14, roofHalfSpan + 0.06);
     const roofColors = [0x424843, 0x50534b, 0x3b423f, 0x5b4a3d, 0x454943, 0x383d3a];
     const roofMaterials = roofColors.map((color) => new MeshStandardMaterial({
       color,
       roughness: 0.88,
       metalness: 0.24
     }));
-    const roofCenterY = 5.3;
+    const roofCenterY = 6.1;
     const roofPitch = 0.16;
-    const roofHalfSpan = 8.72;
     const roofSideCenter = roofHalfSpan / 2;
 
     for (const side of [-1, 1]) {
-      for (let panel = 0; panel < 6; panel += 1) {
+      for (let panel = 0; panel < 10; panel += 1) {
         const sheet = new Mesh(roofSheetGeometry, roofMaterials[(panel * 2 + (side > 0 ? 1 : 0)) % roofMaterials.length]);
         sheet.name = 'weathered corrugated roof sheet';
-        sheet.position.set(-10 + panel * 4, roofCenterY, side * roofSideCenter);
+        sheet.position.set(-18 + panel * 4, roofCenterY, side * roofSideCenter);
         sheet.rotation.x = side * roofPitch;
         destinationScene.add(sheet);
       }
 
       const rafterGeometry = new BoxGeometry(0.18, 0.2, roofHalfSpan);
-      for (let index = 0; index < 7; index += 1) {
+      for (let index = 0; index < 11; index += 1) {
         const rafter = new Mesh(rafterGeometry, roofBeamMaterial);
         rafter.name = 'exposed timber roof rafter';
-        rafter.position.set(-10 + index * (20 / 6), roofCenterY, side * roofSideCenter);
+        rafter.position.set(-18 + index * 3.6, roofCenterY, side * roofSideCenter);
         rafter.rotation.x = side * roofPitch;
         destinationScene.add(rafter);
       }
@@ -828,11 +846,11 @@ async function createGrassScene() {
     const roofRibMaterial = new MeshStandardMaterial({ color: 0x252c28, roughness: 0.78, metalness: 0.3 });
     const roofRibGeometry = new BoxGeometry(0.055, 0.065, roofHalfSpan);
     for (const side of [-1, 1]) {
-      const ribs = new InstancedMesh(roofRibGeometry, roofRibMaterial, 45);
+      const ribs = new InstancedMesh(roofRibGeometry, roofRibMaterial, 81);
       ribs.name = 'raised seams on corrugated roof';
       ribs.matrixAutoUpdate = false;
-      for (let index = 0; index < 45; index += 1) {
-        const x = -12 + index * (24 / 44);
+      for (let index = 0; index < 81; index += 1) {
+        const x = -buildingHalfWidth + index * 0.5;
         const position = new Vector3(x, roofCenterY + 0.09, side * roofSideCenter);
         const rotation = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), side * roofPitch);
         const transform = new Matrix4().compose(position, rotation, new Vector3(1, 1, 1));
@@ -844,8 +862,8 @@ async function createGrassScene() {
 
     const repairMaterial = new MeshStandardMaterial({ color: 0x70483a, roughness: 0.94, metalness: 0.12 });
     for (const [x, side, distance] of [
-      [-8.2, -1, 2.4], [-1.8, -1, 5.8], [6.2, -1, 3.3],
-      [-5.5, 1, 6.2], [2.8, 1, 2.8], [9.2, 1, 5.1]
+      [-16, -1, 3], [-8, -1, 12], [0, -1, 6], [8, -1, 14], [16, -1, 4],
+      [-16, 1, 13], [-8, 1, 5], [0, 1, 15], [8, 1, 3], [16, 1, 10]
     ]) {
       const patch = new Mesh(new BoxGeometry(1.2, 0.08, 1.45), repairMaterial);
       patch.name = 'rusty patch on roof';
@@ -859,14 +877,14 @@ async function createGrassScene() {
     }
 
     const ridgeCap = new Mesh(
-      new BoxGeometry(25.4, 0.24, 0.48),
+      new BoxGeometry(buildingHalfWidth * 2 + 0.8, 0.24, 0.48),
       new MeshStandardMaterial({ color: 0x343a35, roughness: 0.82, metalness: 0.32 })
     );
     ridgeCap.name = 'weathered metal roof ridge cap';
     ridgeCap.position.set(0, roofCenterY + roofSideCenter * Math.sin(roofPitch) + 0.04, 0);
     destinationScene.add(ridgeCap);
 
-    const debrisCount = 64;
+    const debrisCount = 200;
     const debris = new InstancedMesh(brickGeometry, brickMaterial, debrisCount);
     debris.name = 'fallen bricks and rubble';
     debris.matrixAutoUpdate = false;
@@ -879,8 +897,8 @@ async function createGrassScene() {
       let x = 0;
       let z = 0;
       do {
-        x = (random() - 0.5) * 22;
-        z = (random() - 0.5) * 14;
+        x = (random() - 0.5) * buildingHalfWidth * 2;
+        z = (random() - 0.5) * buildingHalfDepth * 2;
       } while (
         Math.hypot(x, z - 4.5) < 1.7
         || (Math.abs(x) < 3.6 && z > 0 && z < 8)
@@ -1058,6 +1076,7 @@ async function createGrassScene() {
     const animatronicLungeDirection = new Vector3();
     let deathThreatRoot = null;
     const techRoomDoors = [];
+    let interiorWalls = [];
     const beginEncounter = () => {
       stopCharacterVoice();
       resetGrabSound();
@@ -1105,7 +1124,7 @@ async function createGrassScene() {
       grassStatus.textContent = 'It caught you!';
     };
 
-    const creatureMoveSpeed = 4.6;
+    const creatureMoveSpeed = 1.5;
     const creatureMinimumSeparation = 2.6;
     const canMoveCreatureTo = (creature, otherCreature, fromX, fromZ, x, z) =>
       canMoveTo(fromX, fromZ, x, z)
@@ -1123,51 +1142,56 @@ async function createGrassScene() {
     };
 
     const getRoomCell = (x, z) => ({
-      column: x < -4 ? 0 : x < 4 ? 1 : 2,
-      row: z < 0 ? 0 : 1
+      column: Math.max(0, Math.min(
+        roomColumnCenters.length - 1,
+        Math.floor((x + buildingHalfWidth) / roomSize)
+      )),
+      row: Math.max(0, Math.min(
+        roomRowCenters.length - 1,
+        Math.floor((z + buildingHalfDepth) / roomSize)
+      ))
     });
 
     const getCreatureChaseTarget = (creature, targetX, targetZ) => {
       const currentCell = getRoomCell(creature.position.x, creature.position.z);
       const targetCell = getRoomCell(targetX, targetZ);
-      const currentRoom = currentCell.row * 3 + currentCell.column;
-      const targetRoom = targetCell.row * 3 + targetCell.column;
+      const currentRoom = currentCell.row * roomColumnCenters.length + currentCell.column;
+      const targetRoom = targetCell.row * roomColumnCenters.length + targetCell.column;
       if (currentRoom === targetRoom) return { x: targetX, z: targetZ };
 
       const queue = [currentRoom];
       const previousRooms = new Map([[currentRoom, null]]);
-      const roomCenters = [-8, 0, 8];
       while (queue.length > 0 && !previousRooms.has(targetRoom)) {
         const room = queue.shift();
-        const column = room % 3;
-        const row = Math.floor(room / 3);
+        const column = room % roomColumnCenters.length;
+        const row = Math.floor(room / roomColumnCenters.length);
         const neighbors = [];
         if (column > 0) neighbors.push({
           room: room - 1,
           axis: 'x',
-          wallPosition: column === 1 ? -4 : 4,
-          doorwayCenter: row === 0 ? -4 : 4,
+          wallPosition: roomColumnCenters[column] - roomSize / 2,
+          doorwayCenter: roomRowCenters[row],
           direction: -1
         });
-        if (column < 2) neighbors.push({
+        if (column < roomColumnCenters.length - 1) neighbors.push({
           room: room + 1,
           axis: 'x',
-          wallPosition: column === 0 ? -4 : 4,
-          doorwayCenter: row === 0 ? -4 : 4,
+          wallPosition: roomColumnCenters[column] + roomSize / 2,
+          doorwayCenter: roomRowCenters[row],
           direction: 1
         });
-        if (row === 0) neighbors.push({
-          room: room + 3,
+        if (row < roomRowCenters.length - 1) neighbors.push({
+          room: room + roomColumnCenters.length,
           axis: 'z',
-          wallPosition: 0,
-          doorwayCenter: roomCenters[column],
+          wallPosition: roomRowCenters[row] + roomSize / 2,
+          doorwayCenter: roomColumnCenters[column],
           direction: 1
         });
-        if (row === 1) neighbors.push({
-          room: room - 3,
+        if (row > 0) neighbors.push({
+          room: room - roomColumnCenters.length,
           axis: 'z',
-          wallPosition: 0,
-          doorwayCenter: roomCenters[column],
+          wallPosition: roomRowCenters[row] - roomSize / 2,
+          doorwayCenter: roomColumnCenters[column],
           direction: -1
         });
 
@@ -1248,7 +1272,6 @@ async function createGrassScene() {
     };
 
     const updateDiabolusRex = (delta, time) => {
-      diabolusRexMixer.update(delta);
       if (!destinationActive || animatronicDead) return;
 
       const dx = grassScene.camera.position.x - diabolusRexRoot.position.x;
@@ -1279,7 +1302,10 @@ async function createGrassScene() {
     };
 
     const updateAnimatronic = (delta, time) => {
-      sharkMixer.update(delta);
+      if (destinationActive) {
+        sharkMixer.update(delta);
+        diabolusRexMixer.update(delta);
+      }
       updateDiabolusRex(delta, time);
       teethJaw.rotation.z = Math.sin(time * 0.004) * 0.14;
       animatronicGlow.intensity = 1.1 + Math.sin(time * 0.006) * 0.3;
@@ -1308,11 +1334,14 @@ async function createGrassScene() {
         return;
       }
 
-      grassScene.camera.updateMatrixWorld();
-      grassScene.gazeRaycaster.setFromCamera(grassScene.screenCenter, grassScene.camera);
-      const isLookingAtAnimatronic = grassScene.gazeRaycaster
-        .intersectObject(animatronicRoot, true)
-        .length > 0;
+      if (time - lastAnimatronicLookCheck >= 100) {
+        grassScene.camera.updateMatrixWorld();
+        grassScene.gazeRaycaster.setFromCamera(grassScene.screenCenter, grassScene.camera);
+        isLookingAtAnimatronic = grassScene.gazeRaycaster
+          .intersectObject(animatronicRoot, true)
+          .length > 0;
+        lastAnimatronicLookCheck = time;
+      }
 
       if (isLookingAtAnimatronic) {
         if (sharkSound.paused) {
@@ -1493,13 +1522,19 @@ async function createGrassScene() {
       return Math.max(impact, voiceIntensity, shotImpact);
     };
 
-    const interiorWalls = [
-      { axis: 'x', position: -4, doorways: [-4, 4] },
-      { axis: 'x', position: 4, doorways: [-4, 4] },
-      { axis: 'z', position: 0, doorways: [-8, 0, 8] }
+    interiorWalls = [
+      ...roomColumnCenters.slice(0, -1).map((center) => ({
+        axis: 'x',
+        position: center + roomSize / 2,
+        doorways: roomRowCenters
+      })),
+      ...roomRowCenters.slice(0, -1).map((center) => ({
+        axis: 'z',
+        position: center + roomSize / 2,
+        doorways: roomColumnCenters
+      }))
     ];
 
-    // DETAILED DOOR WITH FRAME AND HANDLE
     const addTechRoomDoor = (axis, position, center, hingeRotation) => {
       const hinge = new Group();
       hinge.name = 'tech-room exit door hinge';
@@ -1577,7 +1612,12 @@ async function createGrassScene() {
       minZ: roomBounds.min.z + 0.25,
       maxZ: roomBounds.max.z - 0.25,
       destinationScene,
-      destinationBounds: { minX: -11.25, maxX: 11.25, minZ: -7.25, maxZ: 7.25 },
+      destinationBounds: {
+        minX: -buildingHalfWidth + 0.75,
+        maxX: buildingHalfWidth - 0.75,
+        minZ: -buildingHalfDepth + 0.75,
+        maxZ: buildingHalfDepth - 0.75
+      },
       canMoveTo,
       toggleNearbyTechRoomDoor,
       beginEncounter,
@@ -1619,8 +1659,8 @@ async function createGrassScene() {
     });
     return sources;
   });
-  const fieldRows = 48;
-  const spacing = 1.5;
+  const fieldRows = 40;
+  const spacing = 1.8;
   const positionsByVariant = variants.map(() => []);
 
   for (let row = 0; row < fieldRows; row += 1) {
@@ -1724,7 +1764,7 @@ async function createGrassScene() {
   const bladeColors = greenPalette.map((color) => new Color(color));
   const bladeChunkRows = 6;
   const bladeChunkCount = bladeChunkRows * bladeChunkRows;
-  const bladeCount = 2500;
+  const bladeCount = 1600;
   const bladesPerChunk = Array.from({ length: bladeChunkCount }, () => []);
 
   for (let index = 0; index < bladeCount; index += 1) {
