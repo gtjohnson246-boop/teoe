@@ -10,6 +10,7 @@ const grassStatus = document.getElementById('grass-status');
 const grassControls = document.getElementById('grass-controls');
 const backButton = document.getElementById('back-button');
 const deathRestartButton = document.getElementById('death-restart');
+const graphicsResetMessage = 'Graphics paused after a device reset. Waiting for recovery...';
 
 // Passcode UI Elements
 const passcodeContainer = document.getElementById('passcode-container');
@@ -1642,16 +1643,10 @@ async function createGrassScene() {
 
   const loadLivingRoom = () => {
     if (!livingRoomPromise) {
-      livingRoomPromise = buildLivingRoom()
-        .then(async (livingRoom) => {
-          await renderer.compileAsync(livingRoom.scene, camera);
-          await renderer.compileAsync(livingRoom.destinationScene, camera);
-          return livingRoom;
-        })
-        .catch((error) => {
-          livingRoomPromise = null;
-          throw error;
-        });
+      livingRoomPromise = buildLivingRoom().catch((error) => {
+        livingRoomPromise = null;
+        throw error;
+      });
     }
     return livingRoomPromise;
   };
@@ -2189,3 +2184,24 @@ window.addEventListener('keyup', (event) => {
 
 window.addEventListener('blur', () => movementKeys.clear());
 window.addEventListener('resize', resizeGrassScene);
+grassCanvas.addEventListener('webglcontextlost', (event) => {
+  event.preventDefault();
+  cancelAnimationFrame(grassAnimationFrame);
+  grassAnimationFrame = 0;
+  lastGrassFrame = 0;
+
+  if (!grassGame.hidden) {
+    grassStatus.textContent = graphicsResetMessage;
+    grassStatus.dataset.error = 'true';
+  }
+});
+grassCanvas.addEventListener('webglcontextrestored', () => {
+  if (!grassScene) return;
+
+  if (grassStatus.textContent === graphicsResetMessage) {
+    grassStatus.textContent = '';
+    grassStatus.removeAttribute('data-error');
+  }
+  resizeGrassScene();
+  startGrassScene();
+});
