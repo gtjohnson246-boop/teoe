@@ -11,6 +11,7 @@ const grassControls = document.getElementById('grass-controls');
 const backButton = document.getElementById('back-button');
 const deathRestartButton = document.getElementById('death-restart');
 const graphicsResetMessage = 'Graphics paused after a device reset. Waiting for recovery...';
+const grassPixelRatioLimit = 1.25;
 
 // Passcode UI Elements
 const passcodeContainer = document.getElementById('passcode-container');
@@ -170,6 +171,32 @@ function finishIntro() {
 
 window.setTimeout(finishIntro, 2200);
 
+function disposeSceneResources(scene) {
+  const geometries = new Set();
+  const materials = new Set();
+  const textures = new Set();
+
+  scene.traverse((object) => {
+    if (object.geometry) geometries.add(object.geometry);
+    if (!object.material) return;
+
+    const objectMaterials = Array.isArray(object.material)
+      ? object.material
+      : [object.material];
+    objectMaterials.forEach((material) => {
+      materials.add(material);
+      Object.values(material).forEach((value) => {
+        if (value?.isTexture) textures.add(value);
+      });
+    });
+  });
+
+  geometries.forEach((geometry) => geometry.dispose());
+  materials.forEach((material) => material.dispose());
+  textures.forEach((texture) => texture.dispose());
+  scene.clear();
+}
+
 async function createGrassScene() {
   const [
     {
@@ -237,10 +264,9 @@ async function createGrassScene() {
 
   const renderer = new WebGLRenderer({
     canvas: grassCanvas,
-    antialias: true,
-    powerPreference: 'low-power'
+    antialias: true
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, grassPixelRatioLimit));
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.2;
@@ -1837,6 +1863,9 @@ async function createGrassScene() {
   return {
     renderer,
     scene,
+    releaseField() {
+      disposeSceneResources(scene);
+    },
     camera,
     windUniforms,
     lampLight,
@@ -1867,6 +1896,7 @@ function resizeGrassScene() {
   const height = grassCanvas.clientHeight;
   if (width === 0 || height === 0) return;
 
+  grassScene.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, grassPixelRatioLimit));
   grassScene.renderer.setSize(width, height, false);
   grassScene.camera.aspect = width / height;
   grassScene.camera.updateProjectionMatrix();
@@ -1874,7 +1904,7 @@ function resizeGrassScene() {
 
 function renderGrass(time) {
   grassAnimationFrame = 0;
-  if (grassGame.hidden || !grassScene) return;
+  if (grassGame.hidden || document.hidden || !grassScene) return;
 
   const isInDestination = grassScene.livingRoom?.isDestinationActive === true;
   if (isInDestination && lastGrassFrame !== 0 && time - lastGrassFrame < 1000 / 30) {
@@ -2001,6 +2031,7 @@ function renderGrass(time) {
           movementKeys.clear();
           void grassScene.loadLivingRoom()
             .then((livingRoom) => {
+              grassScene.releaseField();
               grassScene.livingRoom = livingRoom;
               setSeatedLivingRoomView();
               livingRoom.beginEncounter();
@@ -2036,6 +2067,8 @@ function renderGrass(time) {
 }
 
 function startGrassScene() {
+  if (document.hidden) return;
+
   resizeGrassScene();
   if (!grassAnimationFrame) {
     lastGrassFrame = 0;
@@ -2210,6 +2243,16 @@ window.addEventListener('keyup', (event) => {
 
 window.addEventListener('blur', () => movementKeys.clear());
 window.addEventListener('resize', resizeGrassScene);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    cancelAnimationFrame(grassAnimationFrame);
+    grassAnimationFrame = 0;
+    lastGrassFrame = 0;
+    movementKeys.clear();
+  } else if (!grassGame.hidden) {
+    startGrassScene();
+  }
+});
 grassCanvas.addEventListener('webglcontextlost', (event) => {
   event.preventDefault();
   cancelAnimationFrame(grassAnimationFrame);
