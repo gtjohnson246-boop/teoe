@@ -163,6 +163,9 @@ function finishIntro() {
   introFinished = true;
   intro.hidden = true;
   menu.hidden = false;
+  if (passcodeInput) {
+    window.setTimeout(() => passcodeInput.focus(), 100);
+  }
 }
 
 window.setTimeout(finishIntro, 2200);
@@ -2035,16 +2038,28 @@ function startGrassScene() {
   }
 }
 
-// PASSCODE VERIFICATION (72303) ON PLAY BUTTON
-playButton.addEventListener('click', async () => {
-  if (passcodeInput && passcodeInput.value.trim() !== '72303') {
-    if (passcodeError) passcodeError.hidden = false;
+function validatePlayAccess() {
+  if (!passcodeInput) return true;
+
+  const isValid = passcodeInput.value.trim() === '72303';
+  if (passcodeError) {
+    passcodeError.hidden = isValid;
+  }
+
+  if (!isValid) {
     passcodeInput.value = '';
     passcodeInput.focus();
+    return false;
+  }
+
+  return true;
+}
+
+playButton.addEventListener('click', async () => {
+  if (!validatePlayAccess()) {
     return;
   }
 
-  if (passcodeError) passcodeError.hidden = true;
   unlockCharacterVoice();
   menu.hidden = true;
   grassGame.hidden = false;
@@ -2086,6 +2101,12 @@ playButton.addEventListener('click', async () => {
     grassStatus.dataset.error = 'true';
   } finally {
     grassLoading = false;
+  }
+});
+
+passcodeInput?.addEventListener('input', () => {
+  if (passcodeError) {
+    passcodeError.hidden = true;
   }
 });
 

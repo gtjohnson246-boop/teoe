@@ -28,7 +28,23 @@
         <img class="skeleton-art" src="skull-background.png" alt="Low-contrast black-and-white skull" />
         <div class="menu-content">
           <h1 class="menu-title">teoe</h1>
-          <button id="play-button" class="play-button" type="button">Play</button>
+          <div id="passcode-container" class="passcode-container" aria-label="Access code entry">
+            <label class="passcode-label" for="passcode-input">Access code</label>
+            <div class="passcode-row">
+              <input
+                id="passcode-input"
+                class="passcode-input"
+                type="password"
+                inputmode="numeric"
+                maxlength="5"
+                autocomplete="off"
+                aria-describedby="passcode-error"
+                placeholder="•••••"
+              />
+              <button id="play-button" class="play-button" type="button">Play</button>
+            </div>
+            <p id="passcode-error" class="passcode-error" hidden>Incorrect access code.</p>
+          </div>
         </div>
       </section>
       <section id="grass-game" class="grass-game" aria-label="Grass scene" hidden>

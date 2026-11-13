@@ -96,6 +96,59 @@ body {
   padding: 2rem 1rem;
 }
 
+.passcode-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  width: min(100%, 24rem);
+  padding: 0.9rem 1rem 0.75rem;
+  border: 1px solid rgba(245, 233, 206, 0.45);
+  border-radius: 0.18rem;
+  background: rgba(8, 8, 8, 0.72);
+  box-shadow: 0 0 24px rgba(45, 34, 20, 0.25);
+}
+
+.passcode-label {
+  color: rgba(255, 248, 232, 0.8);
+  font-family: "Volter Goldfish", sans-serif;
+  font-size: clamp(1.1rem, 2.4vw, 1.5rem);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.passcode-row {
+  display: flex;
+  width: 100%;
+  gap: 0.6rem;
+}
+
+.passcode-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.76rem 0.85rem;
+  border: 1px solid rgba(245, 233, 206, 0.7);
+  border-radius: 0.12em;
+  background: rgba(18, 18, 17, 0.96);
+  color: #fff4df;
+  font: 1.15rem/1.4 "Volter Goldfish", sans-serif;
+  letter-spacing: 0.2em;
+  text-align: center;
+}
+
+.passcode-input:focus {
+  outline: 2px solid rgba(255, 248, 232, 0.9);
+  outline-offset: 2px;
+}
+
+.passcode-error {
+  margin: 0;
+  color: #f7b9b5;
+  font: 0.82rem/1.5 monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .play-button,
 .back-button {
   min-width: 9rem;
