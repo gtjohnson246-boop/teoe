@@ -195,6 +195,29 @@ body {
   cursor: grabbing;
 }
 
+.grass-game.is-cutscene .grass-canvas {
+  pointer-events: none;
+  cursor: default;
+}
+
+.grass-game.is-cutscene .grass-reticle {
+  display: none;
+}
+
+.cutscene-fade {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1.2s ease;
+}
+
+.cutscene-fade.is-visible {
+  opacity: 1;
+}
+
 .blood-overlay {
   position: absolute;
   z-index: 1;
@@ -371,6 +394,27 @@ body {
   right: 1rem;
   min-width: auto;
   font-size: 1rem;
+}
+
+.cutscene-skip {
+  position: absolute;
+  z-index: 4;
+  top: 1rem;
+  left: 1rem;
+  min-width: auto;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid rgba(245, 233, 206, 0.65);
+  border-radius: 0.12em;
+  background: rgba(5, 5, 5, 0.75);
+  color: #fff8e8;
+  font-family: "Volter Goldfish", sans-serif;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.cutscene-skip:hover,
+.cutscene-skip:focus-visible {
+  background: rgba(75, 65, 48, 0.92);
 }
 
 .intro {

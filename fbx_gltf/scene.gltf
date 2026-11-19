@@ -1,0 +1,420 @@
+{
+  "accessors": [
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 37381,
+      "max": [
+        4.585636138916016,
+        4.589184284210205,
+        8.05538272857666
+      ],
+      "min": [
+        -4.426448822021484,
+        -4.142566680908203,
+        9.118174019572084e-17
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 448572,
+      "componentType": 5126,
+      "count": 37381,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5126,
+      "count": 37381,
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 37381,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "componentType": 5125,
+      "count": 130104,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 897144,
+      "componentType": 5126,
+      "count": 55000,
+      "max": [
+        4.750235557556152,
+        4.74498176574707,
+        4.163302898406982
+      ],
+      "min": [
+        -4.573544025421143,
+        -4.252598285675049,
+        -3.3873157501220703
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 1557144,
+      "componentType": 5126,
+      "count": 55000,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 3,
+      "byteOffset": 598096,
+      "componentType": 5126,
+      "count": 55000,
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 299048,
+      "componentType": 5126,
+      "count": 55000,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 520416,
+      "componentType": 5125,
+      "count": 82500,
+      "type": "SCALAR"
+    }
+  ],
+  "asset": {
+    "generator": "fab-model-conversion",
+    "version": "2.0"
+  },
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 850416,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 739048,
+      "byteOffset": 850416,
+      "byteStride": 8,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2217144,
+      "byteOffset": 1589464,
+      "byteStride": 12,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 1478096,
+      "byteOffset": 3806608,
+      "byteStride": 16,
+      "target": 34962
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 5284704,
+      "uri": "scene.bin"
+    }
+  ],
+  "extensionsUsed": [
+    "KHR_materials_specular"
+  ],
+  "images": [
+    {
+      "uri": "textures/_Beech_Trunk__BaseColor.jpeg"
+    },
+    {
+      "uri": "textures/_Beech_Trunk__Normal.png"
+    },
+    {
+      "uri": "textures/_Beech_Leaves__BaseColor.png"
+    },
+    {
+      "uri": "textures/_Beech_Leaves__Normal.png"
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "name": "_Beech_Trunk_",
+      "normalTexture": {
+        "index": 1
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 0
+        },
+        "metallicFactor": 0.0,
+        "roughnessFactor": 0.952431977
+      }
+    },
+    {
+      "alphaMode": "BLEND",
+      "doubleSided": true,
+      "extensions": {
+        "KHR_materials_specular": {
+          "specularColorFactor": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "specularFactor": 0.0359999985
+        }
+      },
+      "name": "_Beech_Leaves_",
+      "normalTexture": {
+        "index": 3
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 2
+        },
+        "metallicFactor": 0.0,
+        "roughnessFactor": 0.600000024
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "_Beech_Trunk___Beech_Trunk__0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 1,
+            "POSITION": 0,
+            "TANGENT": 2,
+            "TEXCOORD_0": 3
+          },
+          "indices": 4,
+          "material": 0,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "_Beech_Leaves___Beech_Leaves__0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 6,
+            "POSITION": 5,
+            "TANGENT": 7,
+            "TEXCOORD_0": 8
+          },
+          "indices": 9,
+          "material": 1,
+          "mode": 4
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "children": [
+        1
+      ],
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        2.220446049250313e-16,
+        -1.0,
+        0.0,
+        0.0,
+        1.0,
+        2.220446049250313e-16,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "FAB converted model"
+    },
+    {
+      "children": [
+        2
+      ],
+      "matrix": [
+        0.009999999776482582,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.009999999776482582,
+        0.0,
+        0.0,
+        -0.009999999776482582,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "Beech Tree.fbx"
+    },
+    {
+      "children": [
+        3,
+        5
+      ],
+      "name": "RootNode"
+    },
+    {
+      "children": [
+        4
+      ],
+      "matrix": [
+        -0.6810694497703162,
+        0.10038470618668546,
+        -0.725304980924143,
+        0.0,
+        0.06871606222111812,
+        0.9949486975537044,
+        0.0731791775644588,
+        0.0,
+        0.7289873163384819,
+        -6.245004513516506e-17,
+        -0.6845272037089674,
+        0.0,
+        1998.07275390625,
+        316.4537353515625,
+        1976.5010986328125,
+        1.0
+      ],
+      "name": "CINEMA_4D_Editor"
+    },
+    {
+      "name": "Object_4"
+    },
+    {
+      "children": [
+        6,
+        8
+      ],
+      "matrix": [
+        -1.0,
+        1.2246467991473535e-16,
+        -1.224646799147353e-16,
+        0.0,
+        1.2246467991473535e-16,
+        1.0,
+        -1.2246467991473535e-16,
+        0.0,
+        1.224646799147353e-16,
+        -1.2246467991473535e-16,
+        -1.0,
+        0.0,
+        -3.70741868019104,
+        1.0107484070358535e-14,
+        -2.633526563644409,
+        1.0
+      ],
+      "name": "_Beech_"
+    },
+    {
+      "children": [
+        7
+      ],
+      "matrix": [
+        151.11456298828125,
+        -7.199975421208678e-30,
+        1.2621774483536187e-29,
+        0.0,
+        1.2621774483536187e-29,
+        3.355417343715167e-14,
+        -151.11456298828125,
+        0.0,
+        7.199975421208676e-30,
+        151.11456298828125,
+        3.355417343715167e-14,
+        0.0,
+        3.1308289294429414e-13,
+        -3.526898020392321e-16,
+        -2.8799307346343994,
+        1.0
+      ],
+      "name": "_Beech_Trunk_"
+    },
+    {
+      "mesh": 0,
+      "name": "_Beech_Trunk___Beech_Trunk__0"
+    },
+    {
+      "children": [
+        9
+      ],
+      "matrix": [
+        151.11456298828125,
+        -8.890881794405832e-31,
+        1.2621774483536187e-29,
+        0.0,
+        1.2621774483536187e-29,
+        3.355417343715167e-14,
+        -151.11456298828125,
+        0.0,
+        8.890881794405816e-31,
+        151.11456298828125,
+        3.355417343715167e-14,
+        0.0,
+        1.6076029396572267e-13,
+        613.691650390625,
+        -2.8802857398986816,
+        1.0
+      ],
+      "name": "_Beech_Leaves_"
+    },
+    {
+      "mesh": 1,
+      "name": "_Beech_Leaves___Beech_Leaves__0"
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987,
+      "wrapS": 10497,
+      "wrapT": 10497
+    }
+  ],
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "FAB converted",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    },
+    {
+      "sampler": 0,
+      "source": 2
+    },
+    {
+      "sampler": 0,
+      "source": 3
+    }
+  ]
+}

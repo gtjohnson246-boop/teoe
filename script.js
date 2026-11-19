@@ -8,6 +8,8 @@ const visionBlink = document.getElementById('vision-blink');
 const animatronicDeath = document.getElementById('animatronic-death');
 const grassStatus = document.getElementById('grass-status');
 const grassControls = document.getElementById('grass-controls');
+const cutsceneFade = document.getElementById('cutscene-fade');
+const cutsceneSkipButton = document.getElementById('cutscene-skip');
 const backButton = document.getElementById('back-button');
 const deathRestartButton = document.getElementById('death-restart');
 const graphicsResetMessage = 'Graphics paused after a device reset. Waiting for recovery...';
@@ -240,11 +242,13 @@ async function createGrassScene() {
       WebGLRenderer
     },
     { GLTFLoader },
-    { createCasualMale }
+    { createCasualMale },
+    { createArrivalCutscene }
   ] = await Promise.all([
     import('three'),
     import('three/addons/loaders/GLTFLoader.js'),
-    import('./casual-male.js?v=freddie-model-6')
+    import('./casual-male.js?v=freddie-model-6'),
+    import('./arrival-cutscene.js?v=arrival-cutscene-1')
   ]);
 
   const random = () => Math.random();
@@ -252,9 +256,10 @@ async function createGrassScene() {
   const loadModel = (path) => new Promise((resolve, reject) => {
     loader.load(path, resolve, undefined, reject);
   });
-  const [gltf, lampGltf] = await Promise.all([
+  const [gltf, lampGltf, arrivalCutscene] = await Promise.all([
     loadModel('grass/tdcrdbur_tier_3.gltf'),
-    loadModel('lamp/scene.gltf')
+    loadModel('lamp/scene.gltf'),
+    createArrivalCutscene({ createCharacter: createCasualMale })
   ]);
   gltf.scene.updateMatrixWorld(true);
   const variants = gltf.scene.children.filter((child) => /^SM_tdcrdbur_Var[A-F]$/.test(child.name));
@@ -1864,6 +1869,7 @@ async function createGrassScene() {
   return {
     renderer,
     scene,
+    arrivalCutscene,
     releaseField() {
       disposeSceneResources(scene);
     },
@@ -1901,6 +1907,10 @@ function resizeGrassScene() {
   grassScene.renderer.setSize(width, height, false);
   grassScene.camera.aspect = width / height;
   grassScene.camera.updateProjectionMatrix();
+  if (grassScene.arrivalCutscene) {
+    grassScene.arrivalCutscene.camera.aspect = width / height;
+    grassScene.arrivalCutscene.camera.updateProjectionMatrix();
+  }
 }
 
 function renderGrass(time) {
@@ -1915,6 +1925,34 @@ function renderGrass(time) {
 
   const delta = lastGrassFrame === 0 ? 0 : Math.min((time - lastGrassFrame) / 1000, 0.05);
   lastGrassFrame = time;
+  const arrivalCutscene = grassScene.arrivalCutscene;
+  if (arrivalCutscene?.active) {
+    const result = arrivalCutscene.update(delta);
+    grassStatus.textContent = result.caption;
+    cutsceneFade.classList.toggle('is-visible', arrivalCutscene.isFading);
+    if (result.active) {
+      grassScene.renderer.render(arrivalCutscene.scene, arrivalCutscene.camera);
+      grassAnimationFrame = requestAnimationFrame(renderGrass);
+      return;
+    }
+
+    arrivalCutscene.dispose();
+    grassScene.arrivalCutscene = null;
+    grassGame.classList.remove('is-cutscene');
+    cutsceneFade.classList.remove('is-visible');
+    cutsceneSkipButton.hidden = true;
+    grassStatus.textContent = '';
+    if (grassScene.livingRoom) {
+      setSeatedLivingRoomView();
+      grassScene.livingRoom.beginEncounter();
+      grassControls.textContent = 'Drag to look around the living room from the couch';
+    } else {
+      cameraYaw = grassScene.spawnYaw;
+      cameraPitch = grassScene.spawnPitch;
+      grassControls.textContent = 'WASD / arrows to move · drag to look · keep the lamp in view for 3 seconds';
+    }
+  }
+
   const grabIntensity = grassScene.livingRoom?.updateEncounter(time) ?? 0;
   let forward = Number(movementKeys.has('KeyW') || movementKeys.has('ArrowUp'))
     - Number(movementKeys.has('KeyS') || movementKeys.has('ArrowDown'));
@@ -2105,8 +2143,18 @@ playButton.addEventListener('click', async () => {
   movementKeys.clear();
   grassStatus.textContent = '';
   grassStatus.removeAttribute('data-error');
+  cutsceneFade.classList.remove('is-visible');
 
   if (grassScene) {
+    if (grassScene.arrivalCutscene) {
+      grassScene.arrivalCutscene.start();
+      grassGame.classList.add('is-cutscene');
+      cutsceneSkipButton.hidden = false;
+      grassControls.textContent = 'Arriving at the abandoned building...';
+      startGrassScene();
+      return;
+    }
+
     if (grassScene.livingRoom) {
       setSeatedLivingRoomView();
       grassScene.livingRoom.beginEncounter();
@@ -2125,22 +2173,30 @@ playButton.addEventListener('click', async () => {
 
   if (grassLoading) return;
   grassLoading = true;
-  grassStatus.textContent = 'Loading the field and lamp...';
+  grassStatus.textContent = 'Loading the field, lamp, and arrival cutscene...';
 
   try {
     grassScene = await createGrassScene();
     cameraYaw = grassScene.spawnYaw;
     cameraPitch = grassScene.spawnPitch;
+    grassScene.arrivalCutscene.start();
+    grassGame.classList.add('is-cutscene');
+    cutsceneSkipButton.hidden = false;
+    grassControls.textContent = 'Arriving at the abandoned building...';
     grassStatus.textContent = '';
     startGrassScene();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error('Could not load the grass field and lamp:', error);
-    grassStatus.textContent = `Could not load the field and lamp: ${message}`;
+    console.error('Could not load the game scene and arrival cutscene:', error);
+    grassStatus.textContent = `Could not load the game scene and arrival cutscene: ${message}`;
     grassStatus.dataset.error = 'true';
   } finally {
     grassLoading = false;
   }
+});
+
+cutsceneSkipButton.addEventListener('click', () => {
+  grassScene?.arrivalCutscene?.skip();
 });
 
 passcodeInput?.addEventListener('input', () => {
@@ -2161,7 +2217,10 @@ deathRestartButton.addEventListener('click', () => {
 
 backButton.addEventListener('click', () => {
   grassGame.hidden = true;
+  grassGame.classList.remove('is-cutscene');
   menu.hidden = false;
+  cutsceneFade.classList.remove('is-visible');
+  cutsceneSkipButton.hidden = true;
   stopCharacterVoice();
   visionBlink.classList.remove('is-blinking');
   movementKeys.clear();

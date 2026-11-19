@@ -16,8 +16,8 @@
         }
       }
     </script>
-    <link rel="stylesheet" href="style.css?v=shark-animatronic-1" />
-    <script src="script.js?v=webgl-stability-3" defer></script>
+    <link rel="stylesheet" href="style.css?v=arrival-cutscene-1" />
+    <script src="script.js?v=arrival-cutscene-1" defer></script>
   </head>
   <body>
     <main class="screen">
@@ -49,6 +49,7 @@
       </section>
       <section id="grass-game" class="grass-game" aria-label="Grass scene" hidden>
         <canvas id="grass-canvas" class="grass-canvas" aria-label="Three-dimensional grass model"></canvas>
+        <div id="cutscene-fade" class="cutscene-fade" aria-hidden="true"></div>
         <div id="blood-overlay" class="blood-overlay" aria-hidden="true"></div>
         <div id="vision-blink" class="vision-blink" aria-hidden="true"></div>
         <section id="animatronic-death" class="animatronic-death" role="dialog" aria-modal="true" aria-labelledby="death-title" hidden>
@@ -62,6 +63,7 @@
         <p id="grass-status" class="grass-status" role="status" aria-live="polite"></p>
         <span class="grass-reticle" aria-hidden="true"></span>
         <p id="grass-controls" class="grass-controls">WASD / arrows to move · drag to look · keep the lamp in view for 3 seconds</p>
+        <button id="cutscene-skip" class="cutscene-skip" type="button" hidden>Skip cutscene</button>
         <button id="back-button" class="back-button" type="button">Back to menu</button>
       </section>
     </main>
