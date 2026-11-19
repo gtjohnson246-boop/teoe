@@ -29,7 +29,7 @@ jobs:
         run: |
           mkdir _site
           cp index.html style.css script.js arrival-cutscene.js casual-male.js skull-background.png Creepster-Regular.ttf Volter-Goldfish.ttf _site/
-          cp -R audio grass lamp couch living-room hunting-rifle brick-stack pizzeria-table basic-pc-monitors freddie_single_camera_speedscan_gltf abandoned-animatronic diabolus-rex industrial-abandonedfactory-door car2_gltf fbx_gltf grass_vegitation_mix_gltf modern_building_gltf _site/
+          cp -R audio grass lamp couch living-room hunting-rifle brick-stack stacked-bricks pizzeria-table basic-pc-monitors freddie_single_camera_speedscan_gltf abandoned-animatronic diabolus-rex industrial-abandonedfactory-door car2_gltf fbx_gltf grass_vegitation_mix_gltf modern_building_gltf _site/
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v3
         with:

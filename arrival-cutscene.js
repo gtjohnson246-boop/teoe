@@ -2,6 +2,7 @@ import {
   AmbientLight,
   Box3,
   BoxGeometry,
+  CanvasTexture,
   Color,
   DirectionalLight,
   FogExp2,
@@ -11,8 +12,10 @@ import {
   PerspectiveCamera,
   PlaneGeometry,
   PointLight,
+  RepeatWrapping,
   Scene,
   SphereGeometry,
+  SRGBColorSpace,
   Vector3
 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -39,6 +42,50 @@ function fitModel(root, model, maxDimension) {
 function smoothstep(value) {
   const clamped = Math.max(0, Math.min(1, value));
   return clamped * clamped * (3 - 2 * clamped);
+}
+
+function makeSurfaceTexture(baseColor, fleckColors, fleckCount, scratchCount = 0) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Could not create a cutscene surface texture.');
+
+  context.fillStyle = baseColor;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  for (let index = 0; index < fleckCount; index += 1) {
+    context.globalAlpha = 0.08 + Math.random() * 0.22;
+    context.fillStyle = fleckColors[Math.floor(Math.random() * fleckColors.length)];
+    context.beginPath();
+    context.ellipse(
+      Math.random() * canvas.width,
+      Math.random() * canvas.height,
+      0.5 + Math.random() * 5,
+      0.5 + Math.random() * 3,
+      Math.random() * Math.PI,
+      0,
+      Math.PI * 2
+    );
+    context.fill();
+  }
+  context.globalAlpha = 1;
+
+  for (let index = 0; index < scratchCount; index += 1) {
+    const x = Math.random() * canvas.width;
+    const y = Math.random() * canvas.height;
+    context.strokeStyle = index % 2 ? 'rgba(8, 10, 10, 0.28)' : 'rgba(143, 137, 119, 0.2)';
+    context.lineWidth = 0.5 + Math.random() * 1.2;
+    context.beginPath();
+    context.moveTo(x, y);
+    context.lineTo(x + (Math.random() - 0.5) * 55, y + 4 + Math.random() * 32);
+    context.stroke();
+  }
+
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  texture.wrapS = RepeatWrapping;
+  texture.wrapT = RepeatWrapping;
+  return texture;
 }
 
 function addModel(scene, source, maxDimension, position) {
@@ -90,7 +137,11 @@ export async function createArrivalCutscene({ createCharacter }) {
 
   const ground = new Mesh(
     new PlaneGeometry(240, 240),
-    new MeshStandardMaterial({ color: 0x394632, roughness: 1 })
+    new MeshStandardMaterial({
+      map: makeSurfaceTexture('#394632', ['#596044', '#242e23', '#746c4b'], 5200),
+      color: 0xffffff,
+      roughness: 1
+    })
   );
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.08;
@@ -99,7 +150,11 @@ export async function createArrivalCutscene({ createCharacter }) {
 
   const road = new Mesh(
     new PlaneGeometry(8, 120),
-    new MeshStandardMaterial({ color: 0x292d2d, roughness: 0.96 })
+    new MeshStandardMaterial({
+      map: makeSurfaceTexture('#292d2d', ['#42413b', '#151a1b', '#34342f'], 2800, 90),
+      color: 0xffffff,
+      roughness: 0.96
+    })
   );
   road.rotation.x = -Math.PI / 2;
   road.position.set(0, -0.035, -4);

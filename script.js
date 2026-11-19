@@ -249,7 +249,7 @@ async function createGrassScene() {
     import('three'),
     import('three/addons/loaders/GLTFLoader.js'),
     import('./casual-male.js?v=freddie-model-6'),
-    import('./arrival-cutscene.js?v=arrival-cutscene-3')
+    import('./arrival-cutscene.js?v=arrival-cutscene-4')
   ]);
 
   const random = () => Math.random();
@@ -475,7 +475,48 @@ async function createGrassScene() {
     const roomRowCenters = [-18, -6, 6, 18];
     const buildingHalfWidth = roomColumnCenters.length * roomSize / 2;
     const buildingHalfDepth = roomRowCenters.length * roomSize / 2;
-    const concreteMaterial = new MeshStandardMaterial({ color: 0x45463e, roughness: 1 });
+    const floorCanvas = document.createElement('canvas');
+    floorCanvas.width = 512;
+    floorCanvas.height = 512;
+    const floorContext = floorCanvas.getContext('2d');
+    if (!floorContext) {
+      throw new Error('Could not create the abandoned building floor texture.');
+    }
+    floorContext.fillStyle = '#45463e';
+    floorContext.fillRect(0, 0, floorCanvas.width, floorCanvas.height);
+    for (let index = 0; index < 4600; index += 1) {
+      floorContext.globalAlpha = 0.06 + random() * 0.17;
+      floorContext.fillStyle = ['#191c19', '#706c5a', '#302e28'][Math.floor(random() * 3)];
+      floorContext.beginPath();
+      floorContext.ellipse(
+        random() * floorCanvas.width,
+        random() * floorCanvas.height,
+        0.4 + random() * 5,
+        0.4 + random() * 2.8,
+        random() * Math.PI,
+        0,
+        Math.PI * 2
+      );
+      floorContext.fill();
+    }
+    floorContext.globalAlpha = 1;
+    for (let index = 0; index < 55; index += 1) {
+      const x = random() * floorCanvas.width;
+      const y = random() * floorCanvas.height;
+      floorContext.strokeStyle = 'rgba(24, 25, 21, 0.3)';
+      floorContext.lineWidth = 0.5 + random();
+      floorContext.beginPath();
+      floorContext.moveTo(x, y);
+      floorContext.lineTo(x + (random() - 0.5) * 32, y + 3 + random() * 22);
+      floorContext.stroke();
+    }
+    const floorTexture = new CanvasTexture(floorCanvas);
+    floorTexture.colorSpace = SRGBColorSpace;
+    const concreteMaterial = new MeshStandardMaterial({
+      map: floorTexture,
+      color: 0xffffff,
+      roughness: 1
+    });
     const buildingFloor = new Mesh(
       new PlaneGeometry(buildingHalfWidth * 2 + 1, buildingHalfDepth * 2 + 1),
       concreteMaterial
@@ -483,6 +524,29 @@ async function createGrassScene() {
     buildingFloor.rotation.x = -Math.PI / 2;
     buildingFloor.position.y = -0.08;
     destinationScene.add(buildingFloor);
+
+    const dustCount = 180;
+    const dustPositions = new Float32Array(dustCount * 3);
+    for (let index = 0; index < dustCount; index += 1) {
+      dustPositions[index * 3] = (random() - 0.5) * buildingHalfWidth * 2;
+      dustPositions[index * 3 + 1] = 0.35 + random() * 4.8;
+      dustPositions[index * 3 + 2] = (random() - 0.5) * buildingHalfDepth * 2;
+    }
+    const dustGeometry = new BufferGeometry();
+    dustGeometry.setAttribute('position', new Float32BufferAttribute(dustPositions, 3));
+    const dustMotes = new Points(
+      dustGeometry,
+      new PointsMaterial({
+        color: 0xc3b99a,
+        size: 0.045,
+        sizeAttenuation: true,
+        transparent: true,
+        opacity: 0.34,
+        depthWrite: false
+      })
+    );
+    dustMotes.name = 'dust drifting through the ruined building';
+    destinationScene.add(dustMotes);
 
     brickGltf.scene.updateMatrixWorld(true);
     const sourceBrickMeshes = [];
@@ -1417,6 +1481,13 @@ async function createGrassScene() {
     };
 
     const updateAnimatronic = (delta, time) => {
+      const dustPosition = dustGeometry.attributes.position;
+      for (let index = 0; index < dustCount; index += 1) {
+        const height = dustPosition.getY(index) + delta * (0.025 + index % 5 * 0.008);
+        dustPosition.setY(index, height > 5.2 ? 0.35 + index % 10 * 0.08 : height);
+      }
+      dustPosition.needsUpdate = true;
+
       if (destinationActive) {
         sharkMixer.update(delta);
         diabolusRexMixer.update(delta);
