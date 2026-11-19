@@ -414,7 +414,7 @@ async function createGrassScene() {
       diabolusRexGltf,
       teethGltf,
       techRoomDoorGltf,
-      brickBaseColor
+      brickGltf
     ] = await Promise.all([
       loadModel('living-room/scene.gltf'),
       loadModel('couch/scene.gltf'),
@@ -425,7 +425,7 @@ async function createGrassScene() {
       loadModel('diabolus-rex/scene.gltf'),
       loadModel('abandoned-animatronic/teeth/scene.gltf'),
       loadModel('industrial-abandonedfactory-door/SM_xengfcss_tier_2.gltf'),
-      new TextureLoader().loadAsync('brick-stack/brick-wall.jpg')
+      loadModel('stacked-bricks/Stacked_Bricks_weurehy_High.gltf')
     ]);
     const roomScene = new Scene();
     roomScene.background = new Color(0x10131a);
@@ -484,22 +484,84 @@ async function createGrassScene() {
     buildingFloor.position.y = -0.08;
     destinationScene.add(buildingFloor);
 
-    brickBaseColor.colorSpace = SRGBColorSpace;
-    brickBaseColor.wrapS = RepeatWrapping;
-    brickBaseColor.wrapT = RepeatWrapping;
-    const brickGeometry = new BoxGeometry(1, 1, 1);
-    const brickMaterial = new MeshStandardMaterial({
-      color: 0xe6ded2,
-      map: brickBaseColor,
-      roughness: 0.98
+    brickGltf.scene.updateMatrixWorld(true);
+    const sourceBrickMeshes = [];
+    brickGltf.scene.traverse((object) => {
+      if (object.isMesh) sourceBrickMeshes.push(object);
     });
-    const brickSize = new Vector3(1, 1, 1);
+    if (sourceBrickMeshes.length !== 1) {
+      throw new Error('The stacked-brick model must contain exactly one mesh.');
+    }
+
+    const sourceBrickMesh = sourceBrickMeshes[0];
+    const sourceGeometry = sourceBrickMesh.geometry;
+    const sourceIndex = sourceGeometry.getIndex();
+    if (!sourceIndex) {
+      throw new Error('The stacked-brick model must use indexed geometry.');
+    }
+
+    const vertexCount = sourceGeometry.getAttribute('position').count;
+    const parents = new Uint32Array(vertexCount);
+    for (let index = 0; index < vertexCount; index += 1) parents[index] = index;
+    const findRoot = (vertex) => {
+      let root = vertex;
+      while (parents[root] !== root) {
+        parents[root] = parents[parents[root]];
+        root = parents[root];
+      }
+      return root;
+    };
+    const joinVertices = (left, right) => {
+      const leftRoot = findRoot(left);
+      const rightRoot = findRoot(right);
+      if (leftRoot !== rightRoot) parents[rightRoot] = leftRoot;
+    };
+
+    for (let index = 0; index < sourceIndex.count; index += 3) {
+      const first = sourceIndex.getX(index);
+      const second = sourceIndex.getX(index + 1);
+      const third = sourceIndex.getX(index + 2);
+      joinVertices(first, second);
+      joinVertices(second, third);
+    }
+
+    // Instance one brick from the high-poly stack instead of duplicating the full stack in every wall slot.
+    const componentIndices = new Map();
+    for (let index = 0; index < sourceIndex.count; index += 3) {
+      const first = sourceIndex.getX(index);
+      const root = findRoot(first);
+      let indices = componentIndices.get(root);
+      if (!indices) {
+        indices = [];
+        componentIndices.set(root, indices);
+      }
+      indices.push(first, sourceIndex.getX(index + 1), sourceIndex.getX(index + 2));
+    }
+
+    const brickIndices = [...componentIndices.values()]
+      .sort((left, right) => left.length - right.length)[0];
+    if (!brickIndices) {
+      throw new Error('The stacked-brick model contains no usable brick geometry.');
+    }
+
+    const brickGeometry = sourceGeometry.clone();
+    brickGeometry.clearGroups();
+    brickGeometry.setIndex(brickIndices);
+    brickGeometry.applyMatrix4(sourceBrickMesh.matrixWorld);
+    brickGeometry.computeBoundingBox();
+    const brickSize = brickGeometry.boundingBox.getSize(new Vector3());
+    const brickCenter = brickGeometry.boundingBox.getCenter(new Vector3());
+    brickGeometry.translate(-brickCenter.x, -brickCenter.y, -brickCenter.z);
+    brickGeometry.computeBoundingBox();
+    brickGeometry.computeBoundingSphere();
+    const brickMaterial = sourceBrickMesh.material;
 
     const wallBrick = (axis, plane, span, rows, openings) => {
       const placements = [];
       const sectionWidth = 1.42;
       const sectionHeight = 0.78;
       const wallDepth = 0.5;
+      const depthLayers = 4;
       const columns = Math.ceil(span / sectionWidth) + 1;
       const wallRotation = new Quaternion().setFromAxisAngle(
         new Vector3(0, 1, 0),
@@ -516,13 +578,16 @@ async function createGrassScene() {
             y: row * 0.76 + sectionHeight / 2,
             z: axis === 'z' ? alongWall : plane,
             width: sectionWidth * (0.94 + random() * 0.1),
-            height: sectionHeight * (0.94 + random() * 0.1),
-            depth: wallDepth * (0.94 + random() * 0.1)
+            height: sectionHeight * (0.94 + random() * 0.1)
           });
         }
       }
 
-      const wall = new InstancedMesh(brickGeometry, brickMaterial, placements.length);
+      const wall = new InstancedMesh(
+        brickGeometry,
+        brickMaterial,
+        placements.length * depthLayers
+      );
       wall.name = 'weathered brick wall';
       wall.receiveShadow = false;
       wall.matrixAutoUpdate = false;
@@ -531,14 +596,22 @@ async function createGrassScene() {
       const transform = new Matrix4();
 
       placements.forEach((brick, index) => {
-        position.set(brick.x, brick.y, brick.z);
-        scale.set(
-          brick.width / brickSize.x,
-          brick.height / brickSize.y,
-          brick.depth / brickSize.z
-        );
-        transform.compose(position, wallRotation, scale);
-        wall.setMatrixAt(index, transform);
+        for (let layer = 0; layer < depthLayers; layer += 1) {
+          const planeOffset = (layer - (depthLayers - 1) / 2) * wallDepth / depthLayers;
+          position.set(
+            brick.x + (axis === 'z' ? planeOffset : 0),
+            brick.y,
+            brick.z + (axis === 'x' ? planeOffset : 0)
+          );
+          const depth = brick.width * brickSize.z / brickSize.x;
+          scale.set(
+            brick.width / brickSize.x,
+            brick.height / brickSize.y,
+            depth / brickSize.z
+          );
+          transform.compose(position, wallRotation, scale);
+          wall.setMatrixAt(index * depthLayers + layer, transform);
+        }
       });
 
       wall.instanceMatrix.needsUpdate = true;
