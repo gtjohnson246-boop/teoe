@@ -223,6 +223,7 @@ async function createGrassScene() {
       MeshBasicMaterial,
       MeshStandardMaterial,
       LoopRepeat,
+      PCFSoftShadowMap,
       PerspectiveCamera,
       PlaneGeometry,
       PointLight,
@@ -248,7 +249,7 @@ async function createGrassScene() {
     import('three'),
     import('three/addons/loaders/GLTFLoader.js'),
     import('./casual-male.js?v=freddie-model-6'),
-    import('./arrival-cutscene.js?v=arrival-cutscene-1')
+    import('./arrival-cutscene.js?v=arrival-cutscene-2')
   ]);
 
   const random = () => Math.random();
@@ -269,10 +270,11 @@ async function createGrassScene() {
 
   const renderer = new WebGLRenderer({
     canvas: grassCanvas,
-    antialias: false,
+    antialias: true,
     powerPreference: 'low-power'
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, grassPixelRatioLimit));
+  renderer.shadowMap.type = PCFSoftShadowMap;
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.2;
@@ -1903,7 +1905,8 @@ function resizeGrassScene() {
   const height = grassCanvas.clientHeight;
   if (width === 0 || height === 0) return;
 
-  grassScene.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, grassPixelRatioLimit));
+  const pixelRatioLimit = grassScene.arrivalCutscene?.active ? 1.5 : grassPixelRatioLimit;
+  grassScene.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, pixelRatioLimit));
   grassScene.renderer.setSize(width, height, false);
   grassScene.camera.aspect = width / height;
   grassScene.camera.updateProjectionMatrix();
@@ -1931,6 +1934,7 @@ function renderGrass(time) {
     grassStatus.textContent = result.caption;
     cutsceneFade.classList.toggle('is-visible', arrivalCutscene.isFading);
     if (result.active) {
+      grassScene.renderer.shadowMap.enabled = true;
       grassScene.renderer.render(arrivalCutscene.scene, arrivalCutscene.camera);
       grassAnimationFrame = requestAnimationFrame(renderGrass);
       return;
@@ -1938,6 +1942,8 @@ function renderGrass(time) {
 
     arrivalCutscene.dispose();
     grassScene.arrivalCutscene = null;
+    grassScene.renderer.shadowMap.enabled = false;
+    resizeGrassScene();
     grassGame.classList.remove('is-cutscene');
     cutsceneFade.classList.remove('is-visible');
     cutsceneSkipButton.hidden = true;

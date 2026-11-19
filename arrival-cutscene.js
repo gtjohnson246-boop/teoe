@@ -75,6 +75,17 @@ export async function createArrivalCutscene({ createCharacter }) {
 
   const moonlight = new DirectionalLight(0xc0d0cc, 1.45);
   moonlight.position.set(-16, 28, 12);
+  moonlight.castShadow = true;
+  moonlight.shadow.mapSize.set(2048, 2048);
+  moonlight.shadow.camera.left = -38;
+  moonlight.shadow.camera.right = 38;
+  moonlight.shadow.camera.top = 48;
+  moonlight.shadow.camera.bottom = -48;
+  moonlight.shadow.camera.near = 0.1;
+  moonlight.shadow.camera.far = 100;
+  moonlight.shadow.camera.updateProjectionMatrix();
+  moonlight.shadow.bias = -0.0002;
+  moonlight.shadow.normalBias = 0.03;
   scene.add(moonlight);
 
   const ground = new Mesh(
