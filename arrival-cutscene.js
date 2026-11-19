@@ -132,13 +132,17 @@ export async function createArrivalCutscene({ createCharacter }) {
     }
   }
 
-  for (const z of [30, 8, -14, -32]) {
+  const grassRows = [-40, -32, -24, -16, -8, 0, 8, 16, 24, 32, 40];
+  for (const z of grassRows) {
     for (const side of [-1, 1]) {
-      addModel(scene, grassGltf.scene, 5, [side * 5.2, 0, z]);
+      addModel(scene, grassGltf.scene, 5.2, [side * 5.8, 0, z + 1.2]);
+      addModel(scene, grassGltf.scene, 4.2, [side * 10.5, 0, z - 1.5]);
+      addModel(scene, grassGltf.scene, 3.6, [side * 15.2, 0, z]);
     }
   }
 
   const car = addModel(scene, carGltf.scene, 5, [0, 0, 32]);
+  car.rotation.y = Math.PI;
   const headlightMaterial = new MeshStandardMaterial({
     color: 0xffe6aa,
     emissive: 0xffc15c,
@@ -211,6 +215,7 @@ export async function createArrivalCutscene({ createCharacter }) {
       characterRoot.visible = true;
       characterRoot.position.set(-1.65, 0, -15.5);
       car.position.set(0, 0, 32);
+      car.rotation.y = Math.PI;
     },
     skip() {
       elapsed = duration;

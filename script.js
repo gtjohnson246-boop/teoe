@@ -249,7 +249,7 @@ async function createGrassScene() {
     import('three'),
     import('three/addons/loaders/GLTFLoader.js'),
     import('./casual-male.js?v=freddie-model-6'),
-    import('./arrival-cutscene.js?v=arrival-cutscene-2')
+    import('./arrival-cutscene.js?v=arrival-cutscene-3')
   ]);
 
   const random = () => Math.random();
