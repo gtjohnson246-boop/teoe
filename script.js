@@ -1103,7 +1103,8 @@ async function createGameScene() {
       gameStatus.textContent = 'It caught you!';
     };
 
-    const creatureMoveSpeed = 1.5;
+    const diabolusRexMoveSpeed = 2.1;
+    const animatronicMoveSpeed = 2.1;
     const creatureMinimumSeparation = 2.6;
     const canMoveCreatureTo = (creature, otherCreature, fromX, fromZ, x, z) =>
       canMoveTo(fromX, fromZ, x, z)
@@ -1205,13 +1206,13 @@ async function createGameScene() {
       };
     };
 
-    const moveCreatureToward = (creature, otherCreature, targetX, targetZ, delta) => {
+    const moveCreatureToward = (creature, otherCreature, targetX, targetZ, delta, moveSpeed) => {
       const dx = targetX - creature.position.x;
       const dz = targetZ - creature.position.z;
       const distance = Math.hypot(dx, dz);
       if (distance < 0.0001) return;
 
-      const moveDistance = Math.min(creatureMoveSpeed * delta, distance);
+      const moveDistance = Math.min(moveSpeed * delta, distance);
       const stepX = (dx / distance) * moveDistance;
       const stepZ = (dz / distance) * moveDistance;
       const startX = creature.position.x;
@@ -1267,7 +1268,8 @@ async function createGameScene() {
           animatronicRoot,
           chaseTarget.x,
           chaseTarget.z,
-          delta
+          delta,
+          diabolusRexMoveSpeed
         );
         distance = Math.hypot(
           gameScene.camera.position.x - diabolusRexRoot.position.x,
@@ -1356,7 +1358,8 @@ async function createGameScene() {
         diabolusRexRoot,
         chaseTarget.x,
         chaseTarget.z,
-        delta
+        delta,
+        animatronicMoveSpeed
       );
     };
 
