@@ -274,7 +274,7 @@ async function createGameScene() {
       diabolusRexGltf,
       teethGltf,
       techRoomDoorGltf,
-      brickGltf
+      wallGltf
     ] = await Promise.all([
       loadModel('living-room/scene.gltf'),
       loadModel('couch/scene.gltf'),
@@ -285,7 +285,7 @@ async function createGameScene() {
       loadModel('diabolus-rex/scene.gltf'),
       loadModel('abandoned-animatronic/teeth/scene.gltf'),
       loadModel('industrial-abandonedfactory-door/SM_xengfcss_tier_2.gltf'),
-      loadModel('stacked-bricks/Stacked_Bricks_weurehy_High.gltf')
+      loadModel('church-brick-wall/scene.gltf')
     ]);
     const roomScene = new Scene();
     roomScene.background = new Color(0x10131a);
@@ -428,178 +428,118 @@ async function createGameScene() {
     dustMotes.name = 'dust drifting through the ruined building';
     destinationScene.add(dustMotes);
 
-    brickGltf.scene.updateMatrixWorld(true);
-    const sourceBrickMeshes = [];
-    brickGltf.scene.traverse((object) => {
-      if (object.isMesh) sourceBrickMeshes.push(object);
+    wallGltf.scene.updateMatrixWorld(true);
+    const sourceWallMeshes = [];
+    wallGltf.scene.traverse((object) => {
+      if (object.isMesh) sourceWallMeshes.push(object);
     });
-    if (sourceBrickMeshes.length !== 1) {
-      throw new Error('The stacked-brick model must contain exactly one mesh.');
+    if (sourceWallMeshes.length !== 1) {
+      throw new Error('The abandoned-building wall model must contain exactly one mesh.');
     }
 
-    const sourceBrickMesh = sourceBrickMeshes[0];
-    const sourceGeometry = sourceBrickMesh.geometry;
-    const sourceIndex = sourceGeometry.getIndex();
-    if (!sourceIndex) {
-      throw new Error('The stacked-brick model must use indexed geometry.');
-    }
+    const sourceWallMesh = sourceWallMeshes[0];
+    const wallGeometry = sourceWallMesh.geometry.clone();
+    wallGeometry.applyMatrix4(sourceWallMesh.matrixWorld);
+    wallGeometry.computeBoundingBox();
+    const wallSize = wallGeometry.boundingBox.getSize(new Vector3());
+    const wallCenter = wallGeometry.boundingBox.getCenter(new Vector3());
+    wallGeometry.translate(-wallCenter.x, -wallCenter.y, -wallCenter.z);
+    wallGeometry.computeBoundingBox();
+    wallGeometry.computeBoundingSphere();
 
-    const vertexCount = sourceGeometry.getAttribute('position').count;
-    const parents = new Uint32Array(vertexCount);
-    for (let index = 0; index < vertexCount; index += 1) parents[index] = index;
-    const findRoot = (vertex) => {
-      let root = vertex;
-      while (parents[root] !== root) {
-        parents[root] = parents[parents[root]];
-        root = parents[root];
-      }
-      return root;
-    };
-    const joinVertices = (left, right) => {
-      const leftRoot = findRoot(left);
-      const rightRoot = findRoot(right);
-      if (leftRoot !== rightRoot) parents[rightRoot] = leftRoot;
-    };
-
-    for (let index = 0; index < sourceIndex.count; index += 3) {
-      const first = sourceIndex.getX(index);
-      const second = sourceIndex.getX(index + 1);
-      const third = sourceIndex.getX(index + 2);
-      joinVertices(first, second);
-      joinVertices(second, third);
-    }
-
-    // Instance one brick from the high-poly stack instead of duplicating the full stack in every wall slot.
-    const componentIndices = new Map();
-    for (let index = 0; index < sourceIndex.count; index += 3) {
-      const first = sourceIndex.getX(index);
-      const root = findRoot(first);
-      let indices = componentIndices.get(root);
-      if (!indices) {
-        indices = [];
-        componentIndices.set(root, indices);
-      }
-      indices.push(first, sourceIndex.getX(index + 1), sourceIndex.getX(index + 2));
-    }
-
-    const brickIndices = [...componentIndices.values()]
-      .sort((left, right) => left.length - right.length)[0];
-    if (!brickIndices) {
-      throw new Error('The stacked-brick model contains no usable brick geometry.');
-    }
-
-    const brickGeometry = sourceGeometry.clone();
-    brickGeometry.clearGroups();
-    brickGeometry.setIndex(brickIndices);
-    brickGeometry.applyMatrix4(sourceBrickMesh.matrixWorld);
-    brickGeometry.computeBoundingBox();
-    const brickSize = brickGeometry.boundingBox.getSize(new Vector3());
-    const brickCenter = brickGeometry.boundingBox.getCenter(new Vector3());
-    brickGeometry.translate(-brickCenter.x, -brickCenter.y, -brickCenter.z);
-    brickGeometry.computeBoundingBox();
-    brickGeometry.computeBoundingSphere();
-    const brickMaterial = sourceBrickMesh.material;
-
-    const wallBrick = (axis, plane, span, rows, openings) => {
-      const placements = [];
-      const sectionWidth = 1.42;
-      const sectionHeight = 0.78;
-      const wallDepth = 0.5;
-      const depthLayers = 4;
-      const columns = Math.ceil(span / sectionWidth) + 1;
-      const wallRotation = new Quaternion().setFromAxisAngle(
-        new Vector3(0, 1, 0),
-        axis === 'z' ? Math.PI / 2 : 0
-      );
-
-      for (let row = 0; row < rows; row += 1) {
-        for (let column = 0; column < columns; column += 1) {
-          const alongWall = -span / 2 + sectionWidth / 2
-            + column * sectionWidth + (row % 2) * sectionWidth / 2;
-          if (openings.some((opening) => opening(alongWall, row))) continue;
-          placements.push({
-            x: axis === 'x' ? alongWall : plane,
-            y: row * 0.76 + sectionHeight / 2,
-            z: axis === 'z' ? alongWall : plane,
-            width: sectionWidth * (1.02 + random() * 0.04),
-            height: sectionHeight * (1.02 + random() * 0.04)
+    const wallHeight = 6 * 0.76;
+    const wallDepth = 0.5;
+    const wallPanels = [];
+    const wallWithOpenings = (axis, plane, span, openings) => {
+      const maxPanelWidth = wallSize.x;
+      const addPanelRange = (start, end, bottom, top) => {
+        if (end - start <= 0.01 || top - bottom <= 0.01) return;
+        const panelCount = Math.ceil((end - start) / maxPanelWidth);
+        const panelWidth = (end - start) / panelCount;
+        for (let index = 0; index < panelCount; index += 1) {
+          wallPanels.push({
+            axis,
+            plane,
+            along: start + panelWidth * (index + 0.5),
+            width: panelWidth,
+            height: top - bottom,
+            y: (bottom + top) / 2
           });
         }
-      }
+      };
 
-      const mortarGeometry = axis === 'x'
-        ? new BoxGeometry(sectionWidth * 1.02, sectionHeight * 1.04, wallDepth * 0.72)
-        : new BoxGeometry(wallDepth * 0.72, sectionHeight * 1.04, sectionWidth * 1.02);
-      const mortarMaterial = new MeshStandardMaterial({
-        color: 0x77725f,
-        roughness: 1,
-        metalness: 0
-      });
-      const mortar = new InstancedMesh(mortarGeometry, mortarMaterial, placements.length);
-      mortar.name = 'brick wall mortar';
-      mortar.matrixAutoUpdate = false;
-      const mortarTransform = new Matrix4();
-      placements.forEach((brick, index) => {
-        mortarTransform.makeTranslation(brick.x, brick.y, brick.z);
-        mortar.setMatrixAt(index, mortarTransform);
-      });
-      mortar.instanceMatrix.needsUpdate = true;
-      destinationScene.add(mortar);
-
-      const wall = new InstancedMesh(
-        brickGeometry,
-        brickMaterial,
-        placements.length * depthLayers
-      );
-      wall.name = 'weathered brick wall';
-      wall.receiveShadow = false;
-      wall.matrixAutoUpdate = false;
-      const position = new Vector3();
-      const scale = new Vector3();
-      const transform = new Matrix4();
-
-      placements.forEach((brick, index) => {
-        for (let layer = 0; layer < depthLayers; layer += 1) {
-          const planeOffset = (layer - (depthLayers - 1) / 2) * wallDepth / depthLayers;
-          position.set(
-            brick.x + (axis === 'z' ? planeOffset : 0),
-            brick.y,
-            brick.z + (axis === 'x' ? planeOffset : 0)
-          );
-          const depth = brick.width * brickSize.z / brickSize.x;
-          scale.set(
-            brick.width / brickSize.x,
-            brick.height / brickSize.y,
-            depth / brickSize.z
-          );
-          transform.compose(position, wallRotation, scale);
-          wall.setMatrixAt(index * depthLayers + layer, transform);
-        }
-      });
-
-      wall.instanceMatrix.needsUpdate = true;
-      destinationScene.add(wall);
+      let cursor = -span / 2;
+      openings
+        .slice()
+        .sort((left, right) => left.center - right.center)
+        .forEach((opening) => {
+          const left = opening.center - opening.width / 2;
+          const right = opening.center + opening.width / 2;
+          addPanelRange(cursor, left, 0, wallHeight);
+          addPanelRange(left, right, 0, opening.bottom);
+          addPanelRange(left, right, opening.top, wallHeight);
+          cursor = right;
+        });
+      addPanelRange(cursor, span / 2, 0, wallHeight);
     };
 
-    wallBrick('x', -buildingHalfDepth, buildingHalfWidth * 2, 6, []);
-    wallBrick('x', buildingHalfDepth, buildingHalfWidth * 2, 6, []);
-    const brokenWindowOpening = (position, row) =>
-      row >= 2 && row <= 4 && roomRowCenters.some((center) => Math.abs(position - center) < 1.35);
-    wallBrick('z', -buildingHalfWidth, buildingHalfDepth * 2, 6, [brokenWindowOpening]);
-    wallBrick('z', buildingHalfWidth, buildingHalfDepth * 2, 6, [brokenWindowOpening]);
+    const buildingWidth = buildingHalfWidth * 2;
+    const buildingDepth = buildingHalfDepth * 2;
+    wallWithOpenings('x', -buildingHalfDepth, buildingWidth, []);
+    wallWithOpenings('x', buildingHalfDepth, buildingWidth, []);
+    const windowOpenings = roomRowCenters.map((center) => ({
+      center,
+      width: 2.7,
+      bottom: 1.52,
+      top: 3.8
+    }));
+    wallWithOpenings('z', -buildingHalfWidth, buildingDepth, windowOpenings);
+    wallWithOpenings('z', buildingHalfWidth, buildingDepth, windowOpenings);
 
-    const doorway = (...centers) => (position, row) =>
-      centers.some((center) => Math.abs(position - center) < 0.9) && row < 4;
+    const doorOpenings = (centers) => centers.map((center) => ({
+      center,
+      width: 1.8,
+      bottom: 0,
+      top: 4 * 0.76
+    }));
     roomRowCenters.slice(0, -1).forEach((center) => {
-      wallBrick('x', center + roomSize / 2, buildingHalfWidth * 2, 6, [
-        doorway(...roomColumnCenters)
-      ]);
+      wallWithOpenings('x', center + roomSize / 2, buildingWidth, doorOpenings(roomColumnCenters));
     });
     roomColumnCenters.slice(0, -1).forEach((center) => {
-      wallBrick('z', center + roomSize / 2, buildingHalfDepth * 2, 6, [
-        doorway(...roomRowCenters)
-      ]);
+      wallWithOpenings('z', center + roomSize / 2, buildingDepth, doorOpenings(roomRowCenters));
     });
+
+    const walls = new InstancedMesh(
+      wallGeometry,
+      sourceWallMesh.material,
+      wallPanels.length
+    );
+    walls.name = 'weathered modeled masonry walls';
+    walls.matrixAutoUpdate = false;
+    const wallRotation = new Quaternion();
+    const wallPosition = new Vector3();
+    const wallScale = new Vector3();
+    const wallTransform = new Matrix4();
+    wallPanels.forEach((panel, index) => {
+      wallPosition.set(
+        panel.axis === 'x' ? panel.along : panel.plane,
+        panel.y,
+        panel.axis === 'z' ? panel.along : panel.plane
+      );
+      wallRotation.setFromAxisAngle(
+        new Vector3(0, 1, 0),
+        panel.axis === 'z' ? Math.PI / 2 : 0
+      );
+      wallScale.set(
+        panel.width / wallSize.x,
+        panel.height / wallSize.y,
+        wallDepth / wallSize.z
+      );
+      wallTransform.compose(wallPosition, wallRotation, wallScale);
+      walls.setMatrixAt(index, wallTransform);
+    });
+    walls.instanceMatrix.needsUpdate = true;
+    destinationScene.add(walls);
 
     const roomCenters = roomRowCenters.flatMap((z) =>
       roomColumnCenters.map((x) => [x, z])
