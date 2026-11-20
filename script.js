@@ -257,7 +257,7 @@ async function createGameScene() {
         ? object.material
         : [object.material];
       object.receiveShadow = true;
-      object.castShadow = !object.isInstancedMesh
+      object.castShadow = (!object.isInstancedMesh || object.userData.castsShadows === true)
         && materials.length > 0
         && materials.every((material) => !material.transparent && material.opacity === 1);
     });
@@ -519,37 +519,50 @@ async function createGameScene() {
       wallWithOpenings('z', center + roomSize / 2, buildingDepth, doorOpenings(roomRowCenters));
     });
 
-    const walls = new InstancedMesh(
-      wallGeometry,
-      sourceWallMesh.material,
-      wallPanels.length
-    );
-    walls.name = 'weathered modeled masonry walls';
-    walls.matrixAutoUpdate = false;
+    const wallChunks = new Map();
     const wallRotation = new Quaternion();
     const wallPosition = new Vector3();
     const wallScale = new Vector3();
     const wallTransform = new Matrix4();
-    wallPanels.forEach((panel, index) => {
-      wallPosition.set(
-        panel.axis === 'x' ? panel.along : panel.plane,
-        panel.y,
-        panel.axis === 'z' ? panel.along : panel.plane
-      );
-      wallRotation.setFromAxisAngle(
-        new Vector3(0, 1, 0),
-        panel.axis === 'z' ? Math.PI / 2 : 0
-      );
-      wallScale.set(
-        panel.width / wallSize.x,
-        panel.height / wallSize.y,
-        wallDepth / wallSize.z
-      );
-      wallTransform.compose(wallPosition, wallRotation, wallScale);
-      walls.setMatrixAt(index, wallTransform);
+    wallPanels.forEach((panel) => {
+      const chunk = panel.axis === 'x'
+        ? Math.max(
+          0,
+          Math.min(roomColumnCenters.length - 1, Math.floor((panel.along + buildingHalfWidth) / roomSize))
+        )
+        : Math.max(
+          0,
+          Math.min(roomRowCenters.length - 1, Math.floor((panel.along + buildingHalfDepth) / roomSize))
+        );
+      const key = `${panel.axis}:${panel.plane}:${chunk}`;
+      if (!wallChunks.has(key)) wallChunks.set(key, []);
+      wallChunks.get(key).push(panel);
     });
-    walls.instanceMatrix.needsUpdate = true;
-    destinationScene.add(walls);
+    wallChunks.forEach((panels, key) => {
+      const walls = new InstancedMesh(wallGeometry, sourceWallMesh.material, panels.length);
+      walls.name = `weathered modeled masonry wall section ${key}`;
+      walls.matrixAutoUpdate = false;
+      panels.forEach((panel, index) => {
+        wallPosition.set(
+          panel.axis === 'x' ? panel.along : panel.plane,
+          panel.y,
+          panel.axis === 'z' ? panel.along : panel.plane
+        );
+        wallRotation.setFromAxisAngle(
+          new Vector3(0, 1, 0),
+          panel.axis === 'z' ? Math.PI / 2 : 0
+        );
+        wallScale.set(
+          panel.width / wallSize.x,
+          panel.height / wallSize.y,
+          wallDepth / wallSize.z
+        );
+        wallTransform.compose(wallPosition, wallRotation, wallScale);
+        walls.setMatrixAt(index, wallTransform);
+      });
+      walls.instanceMatrix.needsUpdate = true;
+      destinationScene.add(walls);
+    });
 
     const roomCenters = roomRowCenters.flatMap((z) =>
       roomColumnCenters.map((x) => [x, z])
@@ -601,17 +614,60 @@ async function createGameScene() {
 
     const woodMaterial = new MeshStandardMaterial({ color: 0x453629, roughness: 1 });
     const fadedFabric = new MeshStandardMaterial({ color: 0x666151, roughness: 1 });
+    const furnishingBatches = new Map();
     const furnishingBox = (name, size, position, material, rotationY = 0) => {
-      const bevelRadius = Math.min(0.055, Math.min(...size.map(Math.abs)) * 0.12);
-      const furnishing = new Mesh(
-        new RoundedBoxGeometry(...size, 3, bevelRadius),
-        material
-      );
-      furnishing.name = name;
-      furnishing.position.set(...position);
-      furnishing.rotation.y = rotationY;
-      destinationScene.add(furnishing);
-      return furnishing;
+      const key = JSON.stringify(size);
+      let batchesByMaterial = furnishingBatches.get(key);
+      if (!batchesByMaterial) {
+        batchesByMaterial = new Map();
+        furnishingBatches.set(key, batchesByMaterial);
+      }
+
+      let batch = batchesByMaterial.get(material);
+      if (!batch) {
+        const bevelRadius = Math.min(0.055, Math.min(...size.map(Math.abs)) * 0.12);
+        batch = {
+          geometry: new RoundedBoxGeometry(...size, 3, bevelRadius),
+          material,
+          instances: []
+        };
+        batchesByMaterial.set(material, batch);
+      }
+      batch.instances.push({ name, position, rotationY });
+    };
+    const flushFurnishingBatches = () => {
+      furnishingBatches.forEach((batchesByMaterial) => {
+        batchesByMaterial.forEach(({ geometry, material, instances }) => {
+          if (instances.length === 1) {
+            const [instance] = instances;
+            const furnishing = new Mesh(geometry, material);
+            furnishing.name = instance.name;
+            furnishing.position.set(...instance.position);
+            furnishing.rotation.y = instance.rotationY;
+            destinationScene.add(furnishing);
+            return;
+          }
+
+          const furnishings = new InstancedMesh(geometry, material, instances.length);
+          furnishings.name = `${instances[0].name} instances`;
+          furnishings.userData.castsShadows = true;
+          furnishings.matrixAutoUpdate = false;
+          instances.forEach((instance, index) => {
+            const position = new Vector3(...instance.position);
+            const rotation = new Quaternion().setFromAxisAngle(
+              new Vector3(0, 1, 0),
+              instance.rotationY
+            );
+            furnishings.setMatrixAt(index, new Matrix4().compose(
+              position,
+              rotation,
+              new Vector3(1, 1, 1)
+            ));
+          });
+          furnishings.instanceMatrix.needsUpdate = true;
+          destinationScene.add(furnishings);
+        });
+      });
     };
 
     const windowFrameMaterial = new MeshStandardMaterial({ color: 0x382b21, roughness: 1 });
@@ -755,19 +811,30 @@ async function createGameScene() {
     flagShape.closePath();
     const flagGeometry = new ShapeGeometry(flagShape);
     const flagColors = [0xc53931, 0xe5bd56, 0x4b7890, 0xd9d1ae];
+    const flagInstances = flagColors.map(() => []);
     for (let index = 0; index < 12; index += 1) {
-      const flag = new Mesh(
+      const position = new Vector3(-3.25 + index * 0.59, 3.75, 7.44);
+      flagInstances[index % flagColors.length].push(
+        new Matrix4().compose(position, new Quaternion(), new Vector3(1, 1, 1))
+      );
+    }
+    flagInstances.forEach((matrices, index) => {
+      const flags = new InstancedMesh(
         flagGeometry,
         new MeshStandardMaterial({
-          color: flagColors[index % flagColors.length],
+          color: flagColors[index],
           roughness: 0.9,
           side: DoubleSide
-        })
+        }),
+        matrices.length
       );
-      flag.name = 'party bunting flag';
-      flag.position.set(-3.25 + index * 0.59, 3.75, 7.44);
-      destinationScene.add(flag);
-    }
+      flags.name = 'party bunting flags';
+      flags.userData.castsShadows = true;
+      flags.matrixAutoUpdate = false;
+      matrices.forEach((matrix, instanceIndex) => flags.setMatrixAt(instanceIndex, matrix));
+      flags.instanceMatrix.needsUpdate = true;
+      destinationScene.add(flags);
+    });
 
     const balloonColors = [0xc93235, 0xe9c650, 0x417b91, 0x6f944c, 0xd98c4d];
     balloonColors.forEach((color, index) => {
@@ -842,6 +909,7 @@ async function createGameScene() {
     furnishingBox('second collapsed bed frame', [2.6, 0.34, 3.4], [9.2, 0.34, -4.3], woodMaterial);
     furnishingBox('second dusty mattress', [2.5, 0.24, 3.25], [9.2, 0.63, -4.3], fadedFabric);
     furnishingBox('second dusty pillow', [1.25, 0.18, 0.72], [9.2, 0.82, -5.35], fadedFabric);
+    flushFurnishingBatches();
 
     const roofBeamMaterial = new MeshStandardMaterial({ color: 0x30271d, roughness: 1 });
     const roofHalfSpan = buildingHalfDepth + 0.72;
@@ -856,24 +924,47 @@ async function createGameScene() {
     const roofPitch = 0.16;
     const roofSideCenter = roofHalfSpan / 2;
 
+    const roofSheetInstances = roofMaterials.map(() => []);
     for (const side of [-1, 1]) {
       for (let panel = 0; panel < 10; panel += 1) {
-        const sheet = new Mesh(roofSheetGeometry, roofMaterials[(panel * 2 + (side > 0 ? 1 : 0)) % roofMaterials.length]);
-        sheet.name = 'weathered corrugated roof sheet';
-        sheet.position.set(-18 + panel * 4, roofCenterY, side * roofSideCenter);
-        sheet.rotation.x = side * roofPitch;
-        destinationScene.add(sheet);
-      }
-
-      const rafterGeometry = new BoxGeometry(0.18, 0.2, roofHalfSpan);
-      for (let index = 0; index < 11; index += 1) {
-        const rafter = new Mesh(rafterGeometry, roofBeamMaterial);
-        rafter.name = 'exposed timber roof rafter';
-        rafter.position.set(-18 + index * 3.6, roofCenterY, side * roofSideCenter);
-        rafter.rotation.x = side * roofPitch;
-        destinationScene.add(rafter);
+        const materialIndex = (panel * 2 + (side > 0 ? 1 : 0)) % roofMaterials.length;
+        const position = new Vector3(-18 + panel * 4, roofCenterY, side * roofSideCenter);
+        const rotation = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), side * roofPitch);
+        roofSheetInstances[materialIndex].push(
+          new Matrix4().compose(position, rotation, new Vector3(1, 1, 1))
+        );
       }
     }
+
+    roofSheetInstances.forEach((matrices, index) => {
+      const sheets = new InstancedMesh(roofSheetGeometry, roofMaterials[index], matrices.length);
+      sheets.name = 'weathered corrugated roof sheets';
+      sheets.userData.castsShadows = true;
+      sheets.matrixAutoUpdate = false;
+      matrices.forEach((matrix, instanceIndex) => sheets.setMatrixAt(instanceIndex, matrix));
+      sheets.instanceMatrix.needsUpdate = true;
+      destinationScene.add(sheets);
+    });
+
+    const rafterGeometry = new BoxGeometry(0.18, 0.2, roofHalfSpan);
+    const rafters = new InstancedMesh(rafterGeometry, roofBeamMaterial, 22);
+    rafters.name = 'exposed timber roof rafters';
+    rafters.userData.castsShadows = true;
+    rafters.matrixAutoUpdate = false;
+    let rafterIndex = 0;
+    for (const side of [-1, 1]) {
+      for (let index = 0; index < 11; index += 1) {
+        const position = new Vector3(-18 + index * 3.6, roofCenterY, side * roofSideCenter);
+        const rotation = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), side * roofPitch);
+        rafters.setMatrixAt(
+          rafterIndex,
+          new Matrix4().compose(position, rotation, new Vector3(1, 1, 1))
+        );
+        rafterIndex += 1;
+      }
+    }
+    rafters.instanceMatrix.needsUpdate = true;
+    destinationScene.add(rafters);
 
     const roofRibMaterial = new MeshStandardMaterial({ color: 0x252c28, roughness: 0.78, metalness: 0.3 });
     const roofRibGeometry = new BoxGeometry(0.055, 0.065, roofHalfSpan);
@@ -893,20 +984,30 @@ async function createGameScene() {
     }
 
     const repairMaterial = new MeshStandardMaterial({ color: 0x70483a, roughness: 0.94, metalness: 0.12 });
+    const repairGeometry = new BoxGeometry(1.2, 0.08, 1.45);
+    const repairs = new InstancedMesh(repairGeometry, repairMaterial, 10);
+    repairs.name = 'rusty patches on roof';
+    repairs.userData.castsShadows = true;
+    repairs.matrixAutoUpdate = false;
+    let repairIndex = 0;
     for (const [x, side, distance] of [
       [-16, -1, 3], [-8, -1, 12], [0, -1, 6], [8, -1, 14], [16, -1, 4],
       [-16, 1, 13], [-8, 1, 5], [0, 1, 15], [8, 1, 3], [16, 1, 10]
     ]) {
-      const patch = new Mesh(new BoxGeometry(1.2, 0.08, 1.45), repairMaterial);
-      patch.name = 'rusty patch on roof';
-      patch.position.set(
+      const position = new Vector3(
         x,
         roofCenterY + (roofSideCenter - distance) * Math.sin(roofPitch) + 0.1,
         side * distance
       );
-      patch.rotation.x = side * roofPitch;
-      destinationScene.add(patch);
+      const rotation = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), side * roofPitch);
+      repairs.setMatrixAt(
+        repairIndex,
+        new Matrix4().compose(position, rotation, new Vector3(1, 1, 1))
+      );
+      repairIndex += 1;
     }
+    repairs.instanceMatrix.needsUpdate = true;
+    destinationScene.add(repairs);
 
     const ridgeCap = new Mesh(
       new BoxGeometry(buildingHalfWidth * 2 + 0.8, 0.24, 0.48),
