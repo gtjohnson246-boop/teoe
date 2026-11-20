@@ -216,7 +216,7 @@ async function createGameScene() {
     import('three'),
     import('three/addons/loaders/GLTFLoader.js'),
     import('three/addons/geometries/RoundedBoxGeometry.js'),
-    import('./surface-detail.js?v=material-detail-1'),
+    import('./surface-detail.js?v=texture-memory-2'),
     import('./casual-male.js?v=freddie-model-6')
   ]);
 
