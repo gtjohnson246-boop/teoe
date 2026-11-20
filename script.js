@@ -43,17 +43,76 @@ let lookPointerId = null;
 let lastLookX = 0;
 let lastLookY = 0;
 let maskWorn = false;
+const maskWearDurationMs = 5000;
+const maskCooldownDurationMs = 30000;
+let maskCooldownUntil = 0;
+let maskWearTimeout = null;
 let voiceAudioContext = null;
 let voiceAnalyser = null;
 let voiceSource = null;
 let voiceWaveform = null;
 
 function setMaskWorn(worn) {
+  if (worn) {
+    if (maskWorn) return false;
+    const now = performance.now();
+    if (now < maskCooldownUntil) return false;
+
+    maskWorn = true;
+    maskCooldownUntil = 0;
+  } else if (maskWorn) {
+    maskCooldownUntil = performance.now() + maskCooldownDurationMs;
+  }
+
+  if (maskWearTimeout !== null) {
+    window.clearTimeout(maskWearTimeout);
+    maskWearTimeout = null;
+  }
+
   maskWorn = worn;
   maskOverlay.classList.toggle('is-worn', maskWorn);
   maskToggleButton.setAttribute('aria-pressed', String(maskWorn));
-  maskToggleButton.textContent = maskWorn ? 'Remove mask (M)' : 'Wear mask (M)';
+  updateMaskButton();
+
+  if (maskWorn) {
+    maskWearTimeout = window.setTimeout(() => {
+      maskWearTimeout = null;
+      setMaskWorn(false);
+    }, maskWearDurationMs);
+  }
+
+  return true;
 }
+
+function resetMask() {
+  if (maskWearTimeout !== null) {
+    window.clearTimeout(maskWearTimeout);
+    maskWearTimeout = null;
+  }
+  maskWorn = false;
+  maskCooldownUntil = 0;
+  maskOverlay.classList.remove('is-worn');
+  maskToggleButton.setAttribute('aria-pressed', 'false');
+  updateMaskButton();
+}
+
+function updateMaskButton() {
+  const cooldownRemainingMs = Math.max(0, maskCooldownUntil - performance.now());
+  const cooldownSeconds = Math.ceil(cooldownRemainingMs / 1000);
+
+  if (maskWorn) {
+    maskToggleButton.disabled = false;
+    maskToggleButton.textContent = 'Remove mask (M)';
+  } else if (cooldownSeconds > 0) {
+    maskToggleButton.disabled = true;
+    maskToggleButton.textContent = `Mask ready in ${cooldownSeconds}s (M)`;
+  } else {
+    maskToggleButton.disabled = false;
+    maskToggleButton.textContent = 'Wear mask (M)';
+  }
+}
+
+window.setInterval(updateMaskButton, 100);
 
 function unlockCharacterVoice() {
   if (!window.AudioContext) return;
@@ -1168,7 +1227,7 @@ async function createGameScene() {
     const techRoomDoors = [];
     let interiorWalls = [];
     const beginEncounter = () => {
-      setMaskWorn(false);
+      resetMask();
       stopCharacterVoice();
       resetGrabSound();
       resetBleedingEffect();
@@ -1478,7 +1537,7 @@ async function createGameScene() {
     };
 
     const respawnFromAnimatronic = () => {
-      setMaskWorn(false);
+      resetMask();
       animatronicDeath.hidden = true;
       resetBleedingEffect();
       animatronicDeathStartedAt = null;
@@ -1915,7 +1974,7 @@ playButton.addEventListener('click', async () => {
     if (gameScene.livingRoom) {
       setSeatedLivingRoomView();
       gameScene.livingRoom.beginEncounter();
-      gameControls.textContent = 'Drag to look around · M wears the mask';
+      gameControls.textContent = 'Drag to look around · M wears the mask for 5 seconds';
     }
     if (gameScene.livingRoom) {
       startGameScene();
@@ -1932,7 +1991,7 @@ playButton.addEventListener('click', async () => {
     gameScene.livingRoom = await gameScene.loadLivingRoom();
     setSeatedLivingRoomView();
     gameScene.livingRoom.beginEncounter();
-    gameControls.textContent = 'Drag to look around · M wears the mask';
+    gameControls.textContent = 'Drag to look around · M wears the mask for 5 seconds';
     gameStatus.textContent = '';
     startGameScene();
   } catch (error) {
@@ -1966,7 +2025,7 @@ maskToggleButton.addEventListener('click', () => {
 });
 
 backButton.addEventListener('click', () => {
-  setMaskWorn(false);
+  resetMask();
   gameScreen.hidden = true;
   menu.hidden = false;
   stopCharacterVoice();
