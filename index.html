@@ -16,8 +16,8 @@
         }
       }
     </script>
-    <link rel="stylesheet" href="style.css?v=arrival-cutscene-1" />
-    <script src="script.js?v=surface-detail-1" defer></script>
+    <link rel="stylesheet" href="style.css?v=indoor-scene-1" />
+    <script src="script.js?v=indoor-scene-1" defer></script>
   </head>
   <body>
     <main class="screen">
@@ -47,9 +47,8 @@
           </div>
         </div>
       </section>
-      <section id="grass-game" class="grass-game" aria-label="Grass scene" hidden>
-        <canvas id="grass-canvas" class="grass-canvas" aria-label="Three-dimensional grass model"></canvas>
-        <div id="cutscene-fade" class="cutscene-fade" aria-hidden="true"></div>
+      <section id="game-screen" class="game-screen" aria-label="Living room game" hidden>
+        <canvas id="game-canvas" class="game-canvas" aria-label="Three-dimensional game scene"></canvas>
         <div id="blood-overlay" class="blood-overlay" aria-hidden="true"></div>
         <div id="vision-blink" class="vision-blink" aria-hidden="true"></div>
         <section id="animatronic-death" class="animatronic-death" role="dialog" aria-modal="true" aria-labelledby="death-title" hidden>
@@ -60,10 +59,9 @@
             <button id="death-restart" class="play-button" type="button">Wake up again</button>
           </div>
         </section>
-        <p id="grass-status" class="grass-status" role="status" aria-live="polite"></p>
-        <span class="grass-reticle" aria-hidden="true"></span>
-        <p id="grass-controls" class="grass-controls">WASD / arrows to move · drag to look · keep the lamp in view for 3 seconds</p>
-        <button id="cutscene-skip" class="cutscene-skip" type="button" hidden>Skip cutscene</button>
+        <p id="game-status" class="game-status" role="status" aria-live="polite"></p>
+        <span class="game-reticle" aria-hidden="true"></span>
+        <p id="game-controls" class="game-controls">Drag to look around the living room from the couch</p>
         <button id="back-button" class="back-button" type="button">Back to menu</button>
       </section>
     </main>

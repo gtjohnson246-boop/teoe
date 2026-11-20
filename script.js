@@ -1,19 +1,17 @@
 const intro = document.getElementById('intro');
 const menu = document.getElementById('menu');
 const playButton = document.getElementById('play-button');
-const grassGame = document.getElementById('grass-game');
-const grassCanvas = document.getElementById('grass-canvas');
+const gameScreen = document.getElementById('game-screen');
+const gameCanvas = document.getElementById('game-canvas');
 const bloodOverlay = document.getElementById('blood-overlay');
 const visionBlink = document.getElementById('vision-blink');
 const animatronicDeath = document.getElementById('animatronic-death');
-const grassStatus = document.getElementById('grass-status');
-const grassControls = document.getElementById('grass-controls');
-const cutsceneFade = document.getElementById('cutscene-fade');
-const cutsceneSkipButton = document.getElementById('cutscene-skip');
+const gameStatus = document.getElementById('game-status');
+const gameControls = document.getElementById('game-controls');
 const backButton = document.getElementById('back-button');
 const deathRestartButton = document.getElementById('death-restart');
 const graphicsResetMessage = 'Graphics paused after a device reset. Waiting for recovery...';
-const grassPixelRatioLimit = 1.25;
+const gamePixelRatioLimit = 1.25;
 
 // Passcode UI Elements
 const passcodeContainer = document.getElementById('passcode-container');
@@ -32,16 +30,11 @@ const sharkSound = new Audio('audio/shark.mp3');
 sharkSound.preload = 'auto';
 
 let introFinished = false;
-let grassScene = null;
-let grassLoading = false;
-let grassAnimationFrame = 0;
-let lastGrassFrame = 0;
-let lampGazeSeconds = 0;
-let enteringLivingRoom = false;
-let livingRoomLoadFailed = false;
-let lastGazeCountdown = 0;
+let gameScene = null;
+let gameLoading = false;
+let gameAnimationFrame = 0;
+let lastGameFrame = 0;
 const movementKeys = new Set();
-const fieldHalfSize = 52;
 let cameraYaw = 0;
 let cameraPitch = 0;
 let lookPointerId = null;
@@ -173,33 +166,7 @@ function finishIntro() {
 
 window.setTimeout(finishIntro, 2200);
 
-function disposeSceneResources(scene) {
-  const geometries = new Set();
-  const materials = new Set();
-  const textures = new Set();
-
-  scene.traverse((object) => {
-    if (object.geometry) geometries.add(object.geometry);
-    if (!object.material) return;
-
-    const objectMaterials = Array.isArray(object.material)
-      ? object.material
-      : [object.material];
-    objectMaterials.forEach((material) => {
-      materials.add(material);
-      Object.values(material).forEach((value) => {
-        if (value?.isTexture && !value.userData?.keepAlive) textures.add(value);
-      });
-    });
-  });
-
-  geometries.forEach((geometry) => geometry.dispose());
-  materials.forEach((material) => material.dispose());
-  textures.forEach((texture) => texture.dispose());
-  scene.clear();
-}
-
-async function createGrassScene() {
+async function createGameScene() {
   const [
     {
       ACESFilmicToneMapping,
@@ -212,7 +179,6 @@ async function createGrassScene() {
       CylinderGeometry,
       DirectionalLight,
       DoubleSide,
-      Euler,
       Float32BufferAttribute,
       Fog,
       Group,
@@ -245,15 +211,13 @@ async function createGrassScene() {
     { GLTFLoader },
     { RoundedBoxGeometry },
     { createSurfaceDetail },
-    { createCasualMale },
-    { createArrivalCutscene }
+    { createCasualMale }
   ] = await Promise.all([
     import('three'),
     import('three/addons/loaders/GLTFLoader.js'),
     import('three/addons/geometries/RoundedBoxGeometry.js'),
     import('./surface-detail.js?v=material-detail-1'),
-    import('./casual-male.js?v=freddie-model-6'),
-    import('./arrival-cutscene.js?v=arrival-cutscene-5')
+    import('./casual-male.js?v=freddie-model-6')
   ]);
 
   const random = () => Math.random();
@@ -261,23 +225,12 @@ async function createGrassScene() {
   const loadModel = (path) => new Promise((resolve, reject) => {
     loader.load(path, resolve, undefined, reject);
   });
-  const [gltf, lampGltf, arrivalCutscene] = await Promise.all([
-    loadModel('grass/tdcrdbur_tier_3.gltf'),
-    loadModel('lamp/scene.gltf'),
-    createArrivalCutscene({ createCharacter: createCasualMale })
-  ]);
-  gltf.scene.updateMatrixWorld(true);
-  const variants = gltf.scene.children.filter((child) => /^SM_tdcrdbur_Var[A-F]$/.test(child.name));
-  if (variants.length === 0) {
-    throw new Error('The grass model contains no usable plant variants.');
-  }
-
   const renderer = new WebGLRenderer({
-    canvas: grassCanvas,
+    canvas: gameCanvas,
     antialias: true,
     powerPreference: 'low-power'
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, grassPixelRatioLimit));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, gamePixelRatioLimit));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = PCFSoftShadowMap;
   renderer.outputColorSpace = SRGBColorSpace;
@@ -285,7 +238,6 @@ async function createGrassScene() {
   renderer.toneMappingExposure = 1.2;
 
   const surfaceDetail = createSurfaceDetail(renderer);
-  surfaceDetail.applyScene(arrivalCutscene.scene);
 
   const configureSceneShadows = (targetScene) => {
     targetScene.traverse((object) => {
@@ -301,145 +253,10 @@ async function createGrassScene() {
     });
   };
 
-  const scene = new Scene();
-  scene.background = new Color(0x17243a);
-  scene.fog = new Fog(0x202d43, 42, 120);
-  scene.add(new HemisphereLight(0x8298c2, 0x302d23, 1.05));
-
-  const moonlight = new DirectionalLight(0xb5c7ea, 0.62);
-  moonlight.position.set(-30, 45, 20);
-  moonlight.castShadow = true;
-  moonlight.shadow.mapSize.set(2048, 2048);
-  moonlight.shadow.camera.left = -58;
-  moonlight.shadow.camera.right = 58;
-  moonlight.shadow.camera.top = 58;
-  moonlight.shadow.camera.bottom = -58;
-  moonlight.shadow.camera.near = 0.1;
-  moonlight.shadow.camera.far = 120;
-  moonlight.shadow.camera.updateProjectionMatrix();
-  moonlight.shadow.normalBias = 0.04;
-  scene.add(moonlight);
-
-  const starPositions = [];
-  for (let index = 0; index < 420; index += 1) {
-    starPositions.push(
-      (random() - 0.5) * 140,
-      12 + random() * 38,
-      (random() - 0.5) * 140
-    );
-  }
-  const starGeometry = new BufferGeometry();
-  starGeometry.setAttribute('position', new Float32BufferAttribute(starPositions, 3));
-  scene.add(new Points(
-    starGeometry,
-    new PointsMaterial({ color: 0xb8c8e8, size: 0.13, sizeAttenuation: false })
-  ));
-
-  const groundCanvas = document.createElement('canvas');
-  groundCanvas.width = 256;
-  groundCanvas.height = 256;
-  const groundContext = groundCanvas.getContext('2d');
-  if (!groundContext) {
-    throw new Error('Could not create the grass field ground texture.');
-  }
-  groundContext.fillStyle = '#59683c';
-  groundContext.fillRect(0, 0, 256, 256);
-  for (let i = 0; i < 4200; i += 1) {
-    const shade = Math.floor(random() * 38);
-    const green = 62 + shade;
-    groundContext.fillStyle = `rgba(${36 + Math.floor(shade * 0.45)}, ${green}, ${29 + Math.floor(shade * 0.28)}, ${0.08 + random() * 0.2})`;
-    const radius = 0.4 + random() * 3;
-    groundContext.beginPath();
-    groundContext.ellipse(
-      random() * 256,
-      random() * 256,
-      radius * (0.8 + random() * 1.2),
-      radius,
-      random() * Math.PI,
-      0,
-      Math.PI * 2
-    );
-    groundContext.fill();
-  }
-  const groundTexture = new CanvasTexture(groundCanvas);
-  groundTexture.colorSpace = SRGBColorSpace;
-  groundTexture.wrapS = RepeatWrapping;
-  groundTexture.wrapT = RepeatWrapping;
-  groundTexture.repeat.set(12, 12);
-
-  const ground = new Mesh(
-    new PlaneGeometry(120, 120),
-    new MeshStandardMaterial({ map: groundTexture, color: 0x9ca98a, roughness: 1 })
-  );
-  ground.rotation.x = -Math.PI / 2;
-  ground.position.y = -0.06;
-  ground.receiveShadow = true;
-  scene.add(ground);
-
-  const lampModel = lampGltf.scene;
-  const lampBulb = lampModel.getObjectByName('Lightbulb_Table_Lamp_0')
-    ?? lampModel.getObjectByName('Lightbulb');
-  if (!lampBulb) {
-    throw new Error('The lamp model is missing its bulb mesh.');
-  }
-
-  const lampMaterials = [];
-  lampBulb.traverse((object) => {
-    if (!object.isMesh) return;
-    const makeGlowingMaterial = (material) => {
-      const glowingMaterial = material.clone();
-      glowingMaterial.emissive.set(0xffb84a);
-      glowingMaterial.emissiveIntensity = 0.7;
-      lampMaterials.push(glowingMaterial);
-      return glowingMaterial;
-    };
-    object.material = Array.isArray(object.material)
-      ? object.material.map(makeGlowingMaterial)
-      : makeGlowingMaterial(object.material);
-  });
-
-  const lampBounds = new Box3().setFromObject(lampModel);
-  const lampCenter = lampBounds.getCenter(new Vector3());
-  lampModel.position.set(-lampCenter.x, -lampBounds.min.y, -lampCenter.z);
-  const lampRoot = new Group();
-  lampRoot.add(lampModel);
-  lampRoot.traverse((object) => {
-    if (!object.isMesh) return;
-    object.castShadow = true;
-    object.receiveShadow = true;
-  });
-  lampRoot.scale.setScalar(2.1);
-  lampRoot.position.set(0, 0.76, -4.2);
-  scene.add(lampRoot);
-  lampRoot.updateMatrixWorld(true);
-  const lampFocus = new Box3().setFromObject(lampRoot).getCenter(new Vector3());
-
-  const table = new Group();
-  const woodMaterial = new MeshStandardMaterial({ color: 0x72543a, roughness: 0.82 });
-  const tableTop = new Mesh(new BoxGeometry(1.65, 0.12, 1.3), woodMaterial);
-  tableTop.position.set(0, 0.7, -4.2);
-  table.add(tableTop);
-  for (const x of [-0.62, 0.62]) {
-    for (const z of [-0.46, 0.46]) {
-      const leg = new Mesh(new BoxGeometry(0.1, 0.7, 0.1), woodMaterial);
-      leg.position.set(x, 0.35, -4.2 + z);
-      table.add(leg);
-    }
-  }
-  table.traverse((object) => {
-    if (!object.isMesh) return;
-    object.castShadow = true;
-    object.receiveShadow = true;
-  });
-  scene.add(table);
-
-  const bulbBounds = new Box3().setFromObject(lampBulb);
-  const lampLight = new PointLight(0xffc66c, 2.4, 18, 2);
-  lampLight.position.copy(bulbBounds.getCenter(new Vector3()));
-  lampLight.position.y += 0.08;
-  scene.add(lampLight);
   const gazeRaycaster = new Raycaster();
   const screenCenter = new Vector2(0, 0);
+  const camera = new PerspectiveCamera(72, 1, 0.1, 140);
+  camera.rotation.order = 'YXZ';
   let lastAnimatronicLookCheck = -Infinity;
   let isLookingAtAnimatronic = false;
   const encounterStartZ = -2.15;
@@ -1149,49 +966,6 @@ async function createGrassScene() {
     ridgeCap.position.set(0, roofCenterY + roofSideCenter * Math.sin(roofPitch) + 0.04, 0);
     destinationScene.add(ridgeCap);
 
-    const debrisCount = 200;
-    const debris = new InstancedMesh(brickGeometry, brickMaterial, debrisCount);
-    debris.name = 'fallen bricks and rubble';
-    debris.matrixAutoUpdate = false;
-    const debrisPosition = new Vector3();
-    const debrisRotation = new Quaternion();
-    const debrisScale = new Vector3();
-    const debrisTransform = new Matrix4();
-    const debrisColor = new Color();
-    for (let index = 0; index < debrisCount; index += 1) {
-      let x = 0;
-      let z = 0;
-      do {
-        x = (random() - 0.5) * buildingHalfWidth * 2;
-        z = (random() - 0.5) * buildingHalfDepth * 2;
-      } while (
-        Math.hypot(x, z - 4.5) < 1.7
-        || (Math.abs(x) < 3.6 && z > 0 && z < 8)
-      );
-
-      const width = 0.72 + random() * 0.55;
-      const height = 0.3 + random() * 0.34;
-      const depth = 0.32 + random() * 0.3;
-      debrisPosition.set(x, height / 2, z);
-      debrisRotation.setFromAxisAngle(new Vector3(0, 1, 0), random() * Math.PI);
-      debrisRotation.multiply(new Quaternion().setFromAxisAngle(
-        new Vector3(0, 0, 1),
-        (random() - 0.5) * 0.16
-      ));
-      debrisScale.set(
-        width / brickSize.x,
-        height / brickSize.y,
-        depth / brickSize.z
-      );
-      debrisTransform.compose(debrisPosition, debrisRotation, debrisScale);
-      debris.setMatrixAt(index, debrisTransform);
-      debrisColor.setHSL(0.015 + random() * 0.035, 0.28 + random() * 0.2, 0.2 + random() * 0.12);
-      debris.setColorAt(index, debrisColor);
-    }
-    debris.instanceMatrix.needsUpdate = true;
-    if (debris.instanceColor) debris.instanceColor.needsUpdate = true;
-    destinationScene.add(debris);
-
     const animatronicRoot = new Group();
     animatronicRoot.name = 'shark animatronic with monster teeth';
     animatronicRoot.position.set(0, 0.8, 4.8);
@@ -1369,8 +1143,8 @@ async function createGrassScene() {
       rifleGrip.visible = false;
       muzzleFlash.visible = false;
       character.root.position.set(0, 0, encounterStartZ);
-      grassStatus.textContent = 'He grabs you...';
-      grassStatus.removeAttribute('data-error');
+      gameStatus.textContent = 'He grabs you...';
+      gameStatus.removeAttribute('data-error');
     };
 
     const killPlayerWithAnimatronic = (time, threatRoot) => {
@@ -1380,13 +1154,13 @@ async function createGrassScene() {
       animatronicDeathPosition.copy(threatRoot.position);
       animatronicLungeDirection
         .set(
-          grassScene.camera.position.x - threatRoot.position.x,
+          gameScene.camera.position.x - threatRoot.position.x,
           0,
-          grassScene.camera.position.z - threatRoot.position.z
+          gameScene.camera.position.z - threatRoot.position.z
         )
         .normalize();
       movementKeys.clear();
-      grassStatus.textContent = 'It caught you!';
+      gameStatus.textContent = 'It caught you!';
     };
 
     const creatureMoveSpeed = 1.5;
@@ -1539,14 +1313,14 @@ async function createGrassScene() {
     const updateDiabolusRex = (delta, time) => {
       if (!destinationActive || animatronicDead) return;
 
-      const dx = grassScene.camera.position.x - diabolusRexRoot.position.x;
-      const dz = grassScene.camera.position.z - diabolusRexRoot.position.z;
+      const dx = gameScene.camera.position.x - diabolusRexRoot.position.x;
+      const dz = gameScene.camera.position.z - diabolusRexRoot.position.z;
       let distance = Math.hypot(dx, dz);
       if (distance > 1.2) {
         const chaseTarget = getCreatureChaseTarget(
           diabolusRexRoot,
-          grassScene.camera.position.x,
-          grassScene.camera.position.z
+          gameScene.camera.position.x,
+          gameScene.camera.position.z
         );
         moveCreatureToward(
           diabolusRexRoot,
@@ -1556,8 +1330,8 @@ async function createGrassScene() {
           delta
         );
         distance = Math.hypot(
-          grassScene.camera.position.x - diabolusRexRoot.position.x,
-          grassScene.camera.position.z - diabolusRexRoot.position.z
+          gameScene.camera.position.x - diabolusRexRoot.position.x,
+          gameScene.camera.position.z - diabolusRexRoot.position.z
         );
       }
 
@@ -1597,8 +1371,8 @@ async function createGrassScene() {
       }
 
       // Calculate distance between player and shark
-      const dx = grassScene.camera.position.x - animatronicRoot.position.x;
-      const dz = grassScene.camera.position.z - animatronicRoot.position.z;
+      const dx = gameScene.camera.position.x - animatronicRoot.position.x;
+      const dz = gameScene.camera.position.z - animatronicRoot.position.z;
       const distanceToPlayer = Math.hypot(dx, dz);
 
       if (distanceToPlayer < 1.3) {
@@ -1607,9 +1381,9 @@ async function createGrassScene() {
       }
 
       if (time - lastAnimatronicLookCheck >= 100) {
-        grassScene.camera.updateMatrixWorld();
-        grassScene.gazeRaycaster.setFromCamera(grassScene.screenCenter, grassScene.camera);
-        isLookingAtAnimatronic = grassScene.gazeRaycaster
+        gameScene.camera.updateMatrixWorld();
+        gameScene.gazeRaycaster.setFromCamera(gameScene.screenCenter, gameScene.camera);
+        isLookingAtAnimatronic = gameScene.gazeRaycaster
           .intersectObject(animatronicRoot, true)
           .length > 0;
         lastAnimatronicLookCheck = time;
@@ -1634,8 +1408,8 @@ async function createGrassScene() {
 
       const chaseTarget = getCreatureChaseTarget(
         animatronicRoot,
-        grassScene.camera.position.x,
-        grassScene.camera.position.z
+        gameScene.camera.position.x,
+        gameScene.camera.position.z
       );
       moveCreatureToward(
         animatronicRoot,
@@ -1658,11 +1432,11 @@ async function createGrassScene() {
       destinationActive = true;
       transportStartedAt = performance.now() - 3000;
       movementKeys.clear();
-      grassScene.camera.position.set(-8, 1.65, -4);
+      gameScene.camera.position.set(-8, 1.65, -4);
       cameraYaw = Math.PI;
       cameraPitch = 0;
-      grassStatus.textContent = '';
-      grassControls.textContent = "WASD / arrows · drag to look · E opens/closes doors · avoid both creatures";
+      gameStatus.textContent = '';
+      gameControls.textContent = "WASD / arrows · drag to look · E opens/closes doors · avoid both creatures";
     };
 
     const updateEncounter = (time) => {
@@ -1672,14 +1446,14 @@ async function createGrassScene() {
         if (!destinationActive && transportElapsed >= 1.55) {
           destinationActive = true;
           movementKeys.clear();
-          grassScene.camera.position.set(-8, 1.65, -4);
+          gameScene.camera.position.set(-8, 1.65, -4);
           cameraYaw = Math.PI;
           cameraPitch = 0;
         }
         if (transportElapsed >= 2.6) {
           visionBlink.classList.remove('is-blinking');
-          grassStatus.textContent = 'You wake up in the tech room.';
-          grassControls.textContent = "WASD / arrows · drag to look · E opens/closes doors · avoid both creatures";
+          gameStatus.textContent = 'You wake up in the tech room.';
+          gameControls.textContent = "WASD / arrows · drag to look · E opens/closes doors · avoid both creatures";
         }
         return 0;
       }
@@ -1737,12 +1511,12 @@ async function createGrassScene() {
           grabSoundPlayed = true;
           void playGrabSound();
         }
-        grassStatus.textContent = 'The man is speaking...';
+        gameStatus.textContent = 'The man is speaking...';
         void playCharacterVoice().catch((error) => {
           console.error('Could not play the character voice:', error);
           voiceError = true;
-          grassStatus.textContent = 'Could not play the character audio. Check your browser audio settings.';
-          grassStatus.dataset.error = 'true';
+          gameStatus.textContent = 'Could not play the character audio. Check your browser audio settings.';
+          gameStatus.dataset.error = 'true';
         });
       }
 
@@ -1767,20 +1541,20 @@ async function createGrassScene() {
         speechFinishedElapsed = elapsed;
         character.mouth.scale.y = 0.35;
         character.jaw.rotation.x = 0;
-        grassStatus.textContent = 'He raises his rifle...';
+        gameStatus.textContent = 'He raises his rifle...';
       }
 
       if (speechFinishedElapsed !== null && shotElapsed === null && elapsed - speechFinishedElapsed >= 1.2) {
         shotElapsed = elapsed;
         muzzleFlash.visible = true;
-        grassStatus.textContent = 'You have been shot. You are bleeding...';
+        gameStatus.textContent = 'You have been shot. You are bleeding...';
         showBleedingEffect();
         playShotSound();
         transportStartedAt = time;
         visionBlink.classList.remove('is-blinking');
         void visionBlink.offsetWidth;
         visionBlink.classList.add('is-blinking');
-        grassStatus.textContent = 'You have been shot. Your vision flickers...';
+        gameStatus.textContent = 'You have been shot. Your vision flickers...';
       }
 
       if (shotElapsed !== null && elapsed - shotElapsed >= 0.12) {
@@ -1923,288 +1697,57 @@ async function createGrassScene() {
     return livingRoomPromise;
   };
 
-  const variantSources = variants.map((variant) => {
-    const sources = [];
-    variant.traverse((object) => {
-      if (object.isMesh) sources.push(object);
-    });
-    return sources;
-  });
-  const fieldRows = 40;
-  const spacing = 1.8;
-  const positionsByVariant = variants.map(() => []);
-
-  for (let row = 0; row < fieldRows; row += 1) {
-    for (let column = 0; column < fieldRows; column += 1) {
-      const x = (column - (fieldRows - 1) / 2) * spacing;
-      const z = (row - (fieldRows - 1) / 2) * spacing;
-      if (Math.hypot(x, z + 4.2) < 1.5) continue;
-
-      const variantIndex = Math.floor(random() * variants.length);
-      positionsByVariant[variantIndex].push({
-        x: x + (random() - 0.5) * 0.45,
-        z: z + (random() - 0.5) * 0.45,
-        yaw: random() * Math.PI * 2,
-        scale: 0.85 + random() * 0.4
-      });
-    }
-  }
-
-  const plantUpright = new Matrix4().makeRotationX(Math.PI / 2);
-  const placement = new Matrix4();
-  const orientation = new Quaternion();
-  const up = new Vector3(0, 1, 0);
-  const plantScale = new Vector3();
-  const plantPosition = new Vector3();
-
-  variants.forEach((variant, variantIndex) => {
-    const positions = positionsByVariant[variantIndex];
-    if (positions.length === 0) return;
-
-    for (const source of variantSources[variantIndex]) {
-      const makeCutoutMaterial = (material) => {
-        const cutoutMaterial = material.clone();
-        cutoutMaterial.transparent = false;
-        cutoutMaterial.alphaTest = 0.4;
-        cutoutMaterial.depthWrite = true;
-        return cutoutMaterial;
-      };
-      const cutoutMaterial = Array.isArray(source.material)
-        ? source.material.map(makeCutoutMaterial)
-        : makeCutoutMaterial(source.material);
-      const plants = new InstancedMesh(source.geometry, cutoutMaterial, positions.length);
-      plants.name = `${variant.name} field`;
-      plants.castShadow = false;
-      plants.receiveShadow = false;
-      const sourceTransform = plantUpright.clone().multiply(source.matrixWorld);
-
-      positions.forEach((position, index) => {
-        orientation.setFromAxisAngle(up, position.yaw);
-        plantScale.setScalar(position.scale);
-        plantPosition.set(position.x, 0, position.z);
-        placement.compose(plantPosition, orientation, plantScale);
-        placement.multiply(sourceTransform);
-        plants.setMatrixAt(index, placement);
-      });
-
-      plants.instanceMatrix.needsUpdate = true;
-      scene.add(plants);
-    }
-  });
-
-  const bladeGeometry = new PlaneGeometry(0.075, 0.46, 2, 4);
-  bladeGeometry.translate(0, 0.21, 0);
-  const bladePositions = bladeGeometry.attributes.position;
-  const bladeVertexColors = [];
-  const bladeBaseColor = new Color(0x465b23);
-  const bladeTipColor = new Color(0xa2ae52);
-  for (let index = 0; index < bladePositions.count; index += 1) {
-    const height = bladePositions.getY(index) + 0.02;
-    const heightRatio = Math.min(height / 0.46, 1);
-    const bend = height * height * 0.16;
-    bladePositions.setX(index, bladePositions.getX(index) * (1 - heightRatio) + bend);
-    const shade = bladeBaseColor.clone().lerp(bladeTipColor, heightRatio);
-    bladeVertexColors.push(shade.r, shade.g, shade.b);
-  }
-  bladePositions.needsUpdate = true;
-  bladeGeometry.setAttribute('color', new Float32BufferAttribute(bladeVertexColors, 3));
-  bladeGeometry.computeVertexNormals();
-  const windUniforms = { time: { value: 0 } };
-  const bladeMaterial = new MeshStandardMaterial({
-    color: 0xffffff,
-    roughness: 0.9,
-    side: DoubleSide,
-    vertexColors: true
-  });
-  bladeMaterial.onBeforeCompile = (shader) => {
-    shader.uniforms.uGrassTime = windUniforms.time;
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nuniform float uGrassTime;')
-      .replace(
-        '#include <begin_vertex>',
-        '#include <begin_vertex>\ntransformed.x += sin(uGrassTime * 1.4 + instanceMatrix[3][0] * 0.4 + instanceMatrix[3][2] * 0.4) * position.y * 0.045;'
-      );
-  };
-  bladeMaterial.customProgramCacheKey = () => 'grass-wind-v1';
-  const bladeMatrix = new Matrix4();
-  const bladeRotation = new Quaternion();
-  const bladeEuler = new Euler();
-  const bladePosition = new Vector3();
-  const bladeScale = new Vector3();
-  const greenPalette = [0x718c35, 0x819b3e, 0x96a949, 0x5e792d, 0xa0ad52];
-  const bladeColors = greenPalette.map((color) => new Color(color));
-  const bladeChunkRows = 6;
-  const bladeChunkCount = bladeChunkRows * bladeChunkRows;
-  const bladeCount = 1600;
-  const bladesPerChunk = Array.from({ length: bladeChunkCount }, () => []);
-
-  for (let index = 0; index < bladeCount; index += 1) {
-    const x = (random() - 0.5) * fieldRows * spacing;
-    const z = (random() - 0.5) * fieldRows * spacing;
-    if (Math.hypot(x, z + 4.2) < 1.5) continue;
-
-    const chunkX = Math.min(
-      bladeChunkRows - 1,
-      Math.floor(((x + (fieldRows * spacing) / 2) / (fieldRows * spacing)) * bladeChunkRows)
-    );
-    const chunkZ = Math.min(
-      bladeChunkRows - 1,
-      Math.floor(((z + (fieldRows * spacing) / 2) / (fieldRows * spacing)) * bladeChunkRows)
-    );
-    const chunkIndex = chunkZ * bladeChunkRows + chunkX;
-    bladePosition.set(x, 0, z);
-    bladeEuler.set(
-      (random() - 0.5) * 0.28,
-      random() * Math.PI * 2,
-      (random() - 0.5) * 0.3,
-      'YXZ'
-    );
-    bladeRotation.setFromEuler(bladeEuler);
-    bladeScale.set(0.75 + random() * 0.65, 0.65 + random() * 0.8, 1);
-    bladeMatrix.compose(bladePosition, bladeRotation, bladeScale);
-    bladesPerChunk[chunkIndex].push([
-      x,
-      z,
-      bladeEuler.x,
-      bladeEuler.y,
-      bladeEuler.z,
-      bladeScale.x,
-      bladeScale.y,
-      Math.floor(random() * greenPalette.length)
-    ]);
-  }
-
-  bladesPerChunk.forEach((instances, chunkIndex) => {
-    if (instances.length === 0) return;
-
-    const blades = new InstancedMesh(bladeGeometry, bladeMaterial, instances.length);
-    blades.name = `Fine grass blades ${chunkIndex}`;
-    instances.forEach((instance, index) => {
-      bladePosition.set(instance[0], 0, instance[1]);
-      bladeEuler.set(instance[2], instance[3], instance[4], 'YXZ');
-      bladeRotation.setFromEuler(bladeEuler);
-      bladeScale.set(instance[5], instance[6], 1);
-      bladeMatrix.compose(bladePosition, bladeRotation, bladeScale);
-      blades.setMatrixAt(index, bladeMatrix);
-      blades.setColorAt(index, bladeColors[instance[7]]);
-    });
-    blades.instanceMatrix.needsUpdate = true;
-    if (blades.instanceColor) blades.instanceColor.needsUpdate = true;
-    scene.add(blades);
-  });
-
-  const camera = new PerspectiveCamera(72, 1, 0.1, 140);
-  camera.position.set(0, 1.7, 0);
-  camera.rotation.order = 'YXZ';
-  const spawnYaw = Math.atan2(-lampFocus.x, -lampFocus.z);
-  const spawnPitch = Math.atan2(
-    lampFocus.y - camera.position.y,
-    Math.hypot(lampFocus.x - camera.position.x, lampFocus.z - camera.position.z)
-  );
-  camera.rotation.set(spawnPitch, spawnYaw, 0, 'YXZ');
-
-  surfaceDetail.applyScene(scene);
-
   return {
     renderer,
-    scene,
-    arrivalCutscene,
-    releaseField() {
-      disposeSceneResources(scene);
-    },
     camera,
-    windUniforms,
-    lampLight,
-    lampRoot,
     gazeRaycaster,
     screenCenter,
     loadLivingRoom,
-    preloadLivingRoom: loadLivingRoom,
-    livingRoom: null,
-    livingRoomPreloadStarted: false,
-    spawnYaw,
-    spawnPitch
+    livingRoom: null
   };
 }
 
 function setSeatedLivingRoomView() {
-  if (!grassScene) return;
+  if (!gameScene) return;
 
-  grassScene.camera.position.set(0, 0.82, 1.6);
+  gameScene.camera.position.set(0, 0.82, 1.6);
   cameraYaw = 0;
   cameraPitch = Math.atan2(0.7 - 0.82, 2.2);
 }
 
-function resizeGrassScene() {
-  if (!grassScene) return;
+function resizeGameScene() {
+  if (!gameScene) return;
 
-  const width = grassCanvas.clientWidth;
-  const height = grassCanvas.clientHeight;
+  const width = gameCanvas.clientWidth;
+  const height = gameCanvas.clientHeight;
   if (width === 0 || height === 0) return;
 
-  const pixelRatioLimit = grassScene.arrivalCutscene?.active ? 1.5 : grassPixelRatioLimit;
-  grassScene.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, pixelRatioLimit));
-  grassScene.renderer.setSize(width, height, false);
-  grassScene.camera.aspect = width / height;
-  grassScene.camera.updateProjectionMatrix();
-  if (grassScene.arrivalCutscene) {
-    grassScene.arrivalCutscene.camera.aspect = width / height;
-    grassScene.arrivalCutscene.camera.updateProjectionMatrix();
-  }
+  gameScene.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, gamePixelRatioLimit));
+  gameScene.renderer.setSize(width, height, false);
+  gameScene.camera.aspect = width / height;
+  gameScene.camera.updateProjectionMatrix();
 }
 
-function renderGrass(time) {
-  grassAnimationFrame = 0;
-  if (grassGame.hidden || document.hidden || !grassScene) return;
+function renderGame(time) {
+  gameAnimationFrame = 0;
+  if (gameScreen.hidden || document.hidden || !gameScene?.livingRoom) return;
 
-  const isInDestination = grassScene.livingRoom?.isDestinationActive === true;
-  if (isInDestination && lastGrassFrame !== 0 && time - lastGrassFrame < 1000 / 30) {
-    grassAnimationFrame = requestAnimationFrame(renderGrass);
+  const livingRoom = gameScene.livingRoom;
+  const isInDestination = livingRoom.isDestinationActive;
+  if (isInDestination && lastGameFrame !== 0 && time - lastGameFrame < 1000 / 30) {
+    gameAnimationFrame = requestAnimationFrame(renderGame);
     return;
   }
 
-  const delta = lastGrassFrame === 0 ? 0 : Math.min((time - lastGrassFrame) / 1000, 0.05);
-  lastGrassFrame = time;
-  const arrivalCutscene = grassScene.arrivalCutscene;
-  if (arrivalCutscene?.active) {
-    const result = arrivalCutscene.update(delta);
-    grassStatus.textContent = result.caption;
-    cutsceneFade.classList.toggle('is-visible', arrivalCutscene.isFading);
-    if (result.active) {
-      grassScene.renderer.render(arrivalCutscene.scene, arrivalCutscene.camera);
-      grassAnimationFrame = requestAnimationFrame(renderGrass);
-      return;
-    }
-
-    arrivalCutscene.dispose();
-    grassScene.arrivalCutscene = null;
-    resizeGrassScene();
-    grassGame.classList.remove('is-cutscene');
-    cutsceneFade.classList.remove('is-visible');
-    cutsceneSkipButton.hidden = true;
-    grassStatus.textContent = '';
-    if (grassScene.livingRoom) {
-      setSeatedLivingRoomView();
-      grassScene.livingRoom.beginEncounter();
-      grassControls.textContent = 'Drag to look around the living room from the couch';
-    } else {
-      cameraYaw = grassScene.spawnYaw;
-      cameraPitch = grassScene.spawnPitch;
-      grassControls.textContent = 'WASD / arrows to move · drag to look · keep the lamp in view for 3 seconds';
-    }
-  }
-
-  const grabIntensity = grassScene.livingRoom?.updateEncounter(time) ?? 0;
+  const delta = lastGameFrame === 0 ? 0 : Math.min((time - lastGameFrame) / 1000, 0.05);
+  lastGameFrame = time;
+  const grabIntensity = livingRoom.updateEncounter(time);
   let forward = Number(movementKeys.has('KeyW') || movementKeys.has('ArrowUp'))
     - Number(movementKeys.has('KeyS') || movementKeys.has('ArrowDown'));
   let strafe = Number(movementKeys.has('KeyD') || movementKeys.has('ArrowRight'))
     - Number(movementKeys.has('KeyA') || movementKeys.has('ArrowLeft'));
-  const minX = grassScene.livingRoom?.minX ?? -fieldHalfSize;
-  const maxX = grassScene.livingRoom?.maxX ?? fieldHalfSize;
-  const minZ = grassScene.livingRoom?.minZ ?? -fieldHalfSize;
-  const maxZ = grassScene.livingRoom?.maxZ ?? fieldHalfSize;
   if (isInDestination) {
-    const bounds = grassScene.livingRoom.destinationBounds;
+    const bounds = livingRoom.destinationBounds;
     const wallClearance = 0.55;
     const length = Math.hypot(forward, strafe) || 1;
     const speed = 4 * delta / length;
@@ -2214,145 +1757,70 @@ function renderGrass(time) {
     const rightZ = -Math.sin(cameraYaw);
     const nextX = Math.max(
       bounds.minX,
-      Math.min(bounds.maxX, grassScene.camera.position.x + (forward * forwardX + strafe * rightX) * speed)
+      Math.min(bounds.maxX, gameScene.camera.position.x + (forward * forwardX + strafe * rightX) * speed)
     );
     const nextZ = Math.max(
       bounds.minZ,
-      Math.min(bounds.maxZ, grassScene.camera.position.z + (forward * forwardZ + strafe * rightZ) * speed)
+      Math.min(bounds.maxZ, gameScene.camera.position.z + (forward * forwardZ + strafe * rightZ) * speed)
     );
-    const canMoveTo = grassScene.livingRoom.canMoveTo;
+    const canMoveTo = livingRoom.canMoveTo;
     if (canMoveTo(
-      grassScene.camera.position.x,
-      grassScene.camera.position.z,
+      gameScene.camera.position.x,
+      gameScene.camera.position.z,
       nextX,
-      grassScene.camera.position.z,
+      gameScene.camera.position.z,
       wallClearance
     )) {
-      grassScene.camera.position.x = nextX;
+      gameScene.camera.position.x = nextX;
     }
     if (canMoveTo(
-      grassScene.camera.position.x,
-      grassScene.camera.position.z,
-      grassScene.camera.position.x,
+      gameScene.camera.position.x,
+      gameScene.camera.position.z,
+      gameScene.camera.position.x,
       nextZ,
       wallClearance
     )) {
-      grassScene.camera.position.z = nextZ;
+      gameScene.camera.position.z = nextZ;
     }
-  } else if (grassScene.livingRoom) {
+  } else {
     movementKeys.clear();
     forward = 0;
     strafe = 0;
-    grassScene.camera.position.x = 0;
-    grassScene.camera.position.z = 1.6;
-    grassScene.camera.position.y = 0.82;
-  } else {
-    const length = Math.hypot(forward, strafe) || 1;
-    const speed = 7 * delta / length;
-    const forwardX = -Math.sin(cameraYaw);
-    const forwardZ = -Math.cos(cameraYaw);
-    const rightX = Math.cos(cameraYaw);
-    const rightZ = -Math.sin(cameraYaw);
-    grassScene.camera.position.x = Math.max(
-      minX,
-      Math.min(maxX, grassScene.camera.position.x + (forward * forwardX + strafe * rightX) * speed)
-    );
-    grassScene.camera.position.z = Math.max(
-      minZ,
-      Math.min(maxZ, grassScene.camera.position.z + (forward * forwardZ + strafe * rightZ) * speed)
-    );
+    gameScene.camera.position.x = 0;
+    gameScene.camera.position.z = 1.6;
+    gameScene.camera.position.y = 0.82;
   }
 
-  grassScene.camera.rotation.set(cameraPitch, cameraYaw, 0, 'YXZ');
+  gameScene.camera.rotation.set(cameraPitch, cameraYaw, 0, 'YXZ');
   if (isInDestination) {
-    grassScene.livingRoom.updateAnimatronic(delta, time);
-    if (grassScene.livingRoom.isPlayerDead) {
+    livingRoom.updateAnimatronic(delta, time);
+    if (livingRoom.isPlayerDead) {
       movementKeys.clear();
       forward = 0;
       strafe = 0;
     }
   }
-  if (grassScene.livingRoom && !isInDestination) {
-    const approach = Math.max(0, Math.min(1, (grassScene.livingRoom.characterPositionZ + 0.65) / 1.35));
-    grassScene.camera.rotation.x += approach * 0.4;
-    grassScene.camera.position.x += Math.sin(time * 0.035) * grabIntensity * 0.045;
-    grassScene.camera.position.y += (Math.sin(time * 0.027) - 0.5) * grabIntensity * 0.06;
-    grassScene.camera.position.z += (Math.cos(time * 0.031) - 1) * grabIntensity * 0.07;
-    grassScene.camera.rotation.x += Math.sin(time * 0.035) * grabIntensity * 0.045;
-    grassScene.camera.rotation.y += Math.sin(time * 0.027) * grabIntensity * 0.035;
+  if (!isInDestination) {
+    const approach = Math.max(0, Math.min(1, (livingRoom.characterPositionZ + 0.65) / 1.35));
+    gameScene.camera.rotation.x += approach * 0.4;
+    gameScene.camera.position.x += Math.sin(time * 0.035) * grabIntensity * 0.045;
+    gameScene.camera.position.y += (Math.sin(time * 0.027) - 0.5) * grabIntensity * 0.06;
+    gameScene.camera.position.z += (Math.cos(time * 0.031) - 1) * grabIntensity * 0.07;
+    gameScene.camera.rotation.x += Math.sin(time * 0.035) * grabIntensity * 0.045;
+    gameScene.camera.rotation.y += Math.sin(time * 0.027) * grabIntensity * 0.035;
   }
-  grassScene.windUniforms.time.value = time * 0.001;
-  if (!grassScene.livingRoom && !enteringLivingRoom) {
-    grassScene.camera.updateMatrixWorld();
-    grassScene.gazeRaycaster.setFromCamera(grassScene.screenCenter, grassScene.camera);
-    const isLookingAtLamp = grassScene.gazeRaycaster
-      .intersectObject(grassScene.lampRoot, true)
-      .length > 0;
-
-    if (isLookingAtLamp) {
-      if (!grassScene.livingRoomPreloadStarted) {
-        grassScene.livingRoomPreloadStarted = true;
-        void grassScene.preloadLivingRoom().catch((error) => {
-          console.error('Could not preload the living room and couch:', error);
-        });
-      }
-
-      if (!livingRoomLoadFailed) {
-        lampGazeSeconds += delta;
-        const countdown = Math.ceil(3 - lampGazeSeconds);
-        if (countdown !== lastGazeCountdown) {
-          lastGazeCountdown = countdown;
-          grassStatus.textContent = `Keep the lamp in view for ${countdown} second${countdown === 1 ? '' : 's'}...`;
-        }
-
-        if (lampGazeSeconds >= 3) {
-          enteringLivingRoom = true;
-          grassStatus.textContent = 'Entering the living room...';
-          movementKeys.clear();
-          void grassScene.loadLivingRoom()
-            .then((livingRoom) => {
-              grassScene.releaseField();
-              grassScene.livingRoom = livingRoom;
-              setSeatedLivingRoomView();
-              livingRoom.beginEncounter();
-              grassControls.textContent = 'Drag to look around the living room from the couch';
-            })
-            .catch((error) => {
-              const message = error instanceof Error ? error.message : String(error);
-              console.error('Could not load the living room and couch:', error);
-              grassStatus.textContent = `Could not load the living room and couch: ${message}`;
-              grassStatus.dataset.error = 'true';
-              livingRoomLoadFailed = true;
-              lampGazeSeconds = 0;
-              lastGazeCountdown = 0;
-            })
-            .finally(() => {
-              enteringLivingRoom = false;
-            });
-        }
-      }
-    } else {
-      lampGazeSeconds = 0;
-      livingRoomLoadFailed = false;
-      lastGazeCountdown = 0;
-      grassStatus.textContent = '';
-      grassStatus.removeAttribute('data-error');
-    }
-  }
-  const activeScene = isInDestination
-    ? grassScene.livingRoom.destinationScene
-    : grassScene.livingRoom?.scene ?? grassScene.scene;
-  grassScene.renderer.render(activeScene, grassScene.camera);
-  grassAnimationFrame = requestAnimationFrame(renderGrass);
+  const activeScene = isInDestination ? livingRoom.destinationScene : livingRoom.scene;
+  gameScene.renderer.render(activeScene, gameScene.camera);
+  gameAnimationFrame = requestAnimationFrame(renderGame);
 }
 
-function startGrassScene() {
+function startGameScene() {
   if (document.hidden) return;
 
-  resizeGrassScene();
-  if (!grassAnimationFrame) {
-    lastGrassFrame = 0;
-    grassAnimationFrame = requestAnimationFrame(renderGrass);
+  resizeGameScene();
+  if (!gameAnimationFrame) {
+    lastGameFrame = 0;
+    gameAnimationFrame = requestAnimationFrame(renderGame);
   }
 }
 
@@ -2380,64 +1848,43 @@ playButton.addEventListener('click', async () => {
 
   unlockCharacterVoice();
   menu.hidden = true;
-  grassGame.hidden = false;
+  gameScreen.hidden = false;
   movementKeys.clear();
-  grassStatus.textContent = '';
-  grassStatus.removeAttribute('data-error');
-  cutsceneFade.classList.remove('is-visible');
+  gameStatus.textContent = '';
+  gameStatus.removeAttribute('data-error');
 
-  if (grassScene) {
-    if (grassScene.arrivalCutscene) {
-      grassScene.arrivalCutscene.start();
-      grassGame.classList.add('is-cutscene');
-      cutsceneSkipButton.hidden = false;
-      grassControls.textContent = 'Arriving at the abandoned building...';
-      startGrassScene();
+  if (gameScene) {
+    if (gameScene.livingRoom) {
+      setSeatedLivingRoomView();
+      gameScene.livingRoom.beginEncounter();
+      gameControls.textContent = 'Drag to look around the living room from the couch';
+    }
+    if (gameScene.livingRoom) {
+      startGameScene();
       return;
     }
-
-    if (grassScene.livingRoom) {
-      setSeatedLivingRoomView();
-      grassScene.livingRoom.beginEncounter();
-      grassControls.textContent = 'Drag to look around the living room from the couch';
-    } else {
-      cameraYaw = grassScene.spawnYaw;
-      cameraPitch = grassScene.spawnPitch;
-      grassControls.textContent = 'WASD / arrows to move · drag to look · keep the lamp in view for 3 seconds';
-    }
-    lampGazeSeconds = 0;
-    livingRoomLoadFailed = false;
-    lastGazeCountdown = 0;
-    startGrassScene();
-    return;
   }
 
-  if (grassLoading) return;
-  grassLoading = true;
-  grassStatus.textContent = 'Loading the field, lamp, and arrival cutscene...';
+  if (gameLoading) return;
+  gameLoading = true;
+  gameStatus.textContent = 'Loading the living room...';
 
   try {
-    grassScene = await createGrassScene();
-    cameraYaw = grassScene.spawnYaw;
-    cameraPitch = grassScene.spawnPitch;
-    grassScene.arrivalCutscene.start();
-    grassGame.classList.add('is-cutscene');
-    cutsceneSkipButton.hidden = false;
-    grassControls.textContent = 'Arriving at the abandoned building...';
-    grassStatus.textContent = '';
-    startGrassScene();
+    gameScene ??= await createGameScene();
+    gameScene.livingRoom = await gameScene.loadLivingRoom();
+    setSeatedLivingRoomView();
+    gameScene.livingRoom.beginEncounter();
+    gameControls.textContent = 'Drag to look around the living room from the couch';
+    gameStatus.textContent = '';
+    startGameScene();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error('Could not load the game scene and arrival cutscene:', error);
-    grassStatus.textContent = `Could not load the game scene and arrival cutscene: ${message}`;
-    grassStatus.dataset.error = 'true';
+    console.error('Could not load the living room:', error);
+    gameStatus.textContent = `Could not load the living room: ${message}`;
+    gameStatus.dataset.error = 'true';
   } finally {
-    grassLoading = false;
+    gameLoading = false;
   }
-});
-
-cutsceneSkipButton.addEventListener('click', () => {
-  grassScene?.arrivalCutscene?.skip();
 });
 
 passcodeInput?.addEventListener('input', () => {
@@ -2453,40 +1900,34 @@ passcodeInput?.addEventListener('keydown', (event) => {
 });
 
 deathRestartButton.addEventListener('click', () => {
-  grassScene?.livingRoom?.respawnFromAnimatronic();
+  gameScene?.livingRoom?.respawnFromAnimatronic();
 });
 
 backButton.addEventListener('click', () => {
-  grassGame.hidden = true;
-  grassGame.classList.remove('is-cutscene');
+  gameScreen.hidden = true;
   menu.hidden = false;
-  cutsceneFade.classList.remove('is-visible');
-  cutsceneSkipButton.hidden = true;
   stopCharacterVoice();
   visionBlink.classList.remove('is-blinking');
   movementKeys.clear();
-  lampGazeSeconds = 0;
-  livingRoomLoadFailed = false;
-  lastGazeCountdown = 0;
   lookPointerId = null;
-  grassCanvas.classList.remove('is-looking');
-  cancelAnimationFrame(grassAnimationFrame);
-  grassAnimationFrame = 0;
-  lastGrassFrame = 0;
+  gameCanvas.classList.remove('is-looking');
+  cancelAnimationFrame(gameAnimationFrame);
+  gameAnimationFrame = 0;
+  lastGameFrame = 0;
 });
 
-grassCanvas.addEventListener('pointerdown', (event) => {
+gameCanvas.addEventListener('pointerdown', (event) => {
   if (!event.isPrimary || event.button !== 0) return;
 
   lookPointerId = event.pointerId;
   lastLookX = event.clientX;
   lastLookY = event.clientY;
-  grassCanvas.classList.add('is-looking');
-  grassCanvas.setPointerCapture(event.pointerId);
+  gameCanvas.classList.add('is-looking');
+  gameCanvas.setPointerCapture(event.pointerId);
   event.preventDefault();
 });
 
-grassCanvas.addEventListener('pointermove', (event) => {
+gameCanvas.addEventListener('pointermove', (event) => {
   if (event.pointerId !== lookPointerId) return;
 
   const deltaX = event.clientX - lastLookX;
@@ -2501,30 +1942,30 @@ function stopLooking(event) {
   if (event.pointerId !== lookPointerId) return;
 
   lookPointerId = null;
-  grassCanvas.classList.remove('is-looking');
-  if (grassCanvas.hasPointerCapture(event.pointerId)) {
-    grassCanvas.releasePointerCapture(event.pointerId);
+  gameCanvas.classList.remove('is-looking');
+  if (gameCanvas.hasPointerCapture(event.pointerId)) {
+    gameCanvas.releasePointerCapture(event.pointerId);
   }
 }
 
-grassCanvas.addEventListener('pointerup', stopLooking);
-grassCanvas.addEventListener('pointercancel', stopLooking);
+gameCanvas.addEventListener('pointerup', stopLooking);
+gameCanvas.addEventListener('pointercancel', stopLooking);
 
 window.addEventListener('keydown', (event) => {
-  if (grassGame.hidden) return;
+  if (gameScreen.hidden) return;
   if (event.code === 'KeyE') {
-    if (!event.repeat && grassScene?.livingRoom?.isDestinationActive) {
+    if (!event.repeat && gameScene?.livingRoom?.isDestinationActive) {
       event.preventDefault();
-      const result = grassScene.livingRoom.toggleNearbyTechRoomDoor(
-        grassScene.camera.position.x,
-        grassScene.camera.position.z
+      const result = gameScene.livingRoom.toggleNearbyTechRoomDoor(
+        gameScene.camera.position.x,
+        gameScene.camera.position.z
       );
       if (result.found) {
-        grassStatus.textContent = result.isOpen
+        gameStatus.textContent = result.isOpen
           ? 'The tech-room door creaks open.'
           : 'The tech-room door shuts tightly.';
       } else {
-        grassStatus.textContent = 'Move closer to a door to interact with it.';
+        gameStatus.textContent = 'Move closer to a door to interact with it.';
       }
     }
     return;
@@ -2533,8 +1974,8 @@ window.addEventListener('keydown', (event) => {
   if (!movementCode) return;
 
   event.preventDefault();
-  if (grassScene?.livingRoom
-    && (!grassScene.livingRoom.isDestinationActive || grassScene.livingRoom.isPlayerDead)) return;
+  if (gameScene?.livingRoom
+    && (!gameScene.livingRoom.isDestinationActive || gameScene.livingRoom.isPlayerDead)) return;
   movementKeys.add(event.code);
 });
 
@@ -2543,35 +1984,35 @@ window.addEventListener('keyup', (event) => {
 });
 
 window.addEventListener('blur', () => movementKeys.clear());
-window.addEventListener('resize', resizeGrassScene);
+window.addEventListener('resize', resizeGameScene);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
-    cancelAnimationFrame(grassAnimationFrame);
-    grassAnimationFrame = 0;
-    lastGrassFrame = 0;
+    cancelAnimationFrame(gameAnimationFrame);
+    gameAnimationFrame = 0;
+    lastGameFrame = 0;
     movementKeys.clear();
-  } else if (!grassGame.hidden) {
-    startGrassScene();
+  } else if (!gameScreen.hidden) {
+    startGameScene();
   }
 });
-grassCanvas.addEventListener('webglcontextlost', (event) => {
+gameCanvas.addEventListener('webglcontextlost', (event) => {
   event.preventDefault();
-  cancelAnimationFrame(grassAnimationFrame);
-  grassAnimationFrame = 0;
-  lastGrassFrame = 0;
+  cancelAnimationFrame(gameAnimationFrame);
+  gameAnimationFrame = 0;
+  lastGameFrame = 0;
 
-  if (!grassGame.hidden) {
-    grassStatus.textContent = graphicsResetMessage;
-    grassStatus.dataset.error = 'true';
+  if (!gameScreen.hidden) {
+    gameStatus.textContent = graphicsResetMessage;
+    gameStatus.dataset.error = 'true';
   }
 });
-grassCanvas.addEventListener('webglcontextrestored', () => {
-  if (!grassScene) return;
+gameCanvas.addEventListener('webglcontextrestored', () => {
+  if (!gameScene) return;
 
-  if (grassStatus.textContent === graphicsResetMessage) {
-    grassStatus.textContent = '';
-    grassStatus.removeAttribute('data-error');
+  if (gameStatus.textContent === graphicsResetMessage) {
+    gameStatus.textContent = '';
+    gameStatus.removeAttribute('data-error');
   }
-  resizeGrassScene();
-  startGrassScene();
+  resizeGameScene();
+  startGameScene();
 });
