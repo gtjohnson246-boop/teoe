@@ -216,6 +216,11 @@ export async function createArrivalCutscene({ createCharacter }) {
   const characterRoot = character.root;
   characterRoot.position.set(-1.65, 0, -15.5);
   characterRoot.rotation.y = Math.PI;
+  characterRoot.traverse((object) => {
+    if (!object.isMesh) return;
+    object.castShadow = true;
+    object.receiveShadow = true;
+  });
   scene.add(characterRoot);
 
   const camera = new PerspectiveCamera(58, 1, 0.1, 220);
@@ -245,7 +250,7 @@ export async function createArrivalCutscene({ createCharacter }) {
       objectMaterials.forEach((material) => {
         materials.add(material);
         Object.values(material).forEach((value) => {
-          if (value?.isTexture) textures.add(value);
+          if (value?.isTexture && !value.userData?.keepAlive) textures.add(value);
         });
       });
     });

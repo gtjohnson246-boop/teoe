@@ -13,7 +13,7 @@ const cutsceneSkipButton = document.getElementById('cutscene-skip');
 const backButton = document.getElementById('back-button');
 const deathRestartButton = document.getElementById('death-restart');
 const graphicsResetMessage = 'Graphics paused after a device reset. Waiting for recovery...';
-const grassPixelRatioLimit = 1;
+const grassPixelRatioLimit = 1.25;
 
 // Passcode UI Elements
 const passcodeContainer = document.getElementById('passcode-container');
@@ -188,7 +188,7 @@ function disposeSceneResources(scene) {
     objectMaterials.forEach((material) => {
       materials.add(material);
       Object.values(material).forEach((value) => {
-        if (value?.isTexture) textures.add(value);
+        if (value?.isTexture && !value.userData?.keepAlive) textures.add(value);
       });
     });
   });
@@ -243,13 +243,17 @@ async function createGrassScene() {
       WebGLRenderer
     },
     { GLTFLoader },
+    { RoundedBoxGeometry },
+    { createSurfaceDetail },
     { createCasualMale },
     { createArrivalCutscene }
   ] = await Promise.all([
     import('three'),
     import('three/addons/loaders/GLTFLoader.js'),
+    import('three/addons/geometries/RoundedBoxGeometry.js'),
+    import('./surface-detail.js?v=material-detail-1'),
     import('./casual-male.js?v=freddie-model-6'),
-    import('./arrival-cutscene.js?v=arrival-cutscene-4')
+    import('./arrival-cutscene.js?v=arrival-cutscene-5')
   ]);
 
   const random = () => Math.random();
@@ -274,10 +278,28 @@ async function createGrassScene() {
     powerPreference: 'low-power'
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, grassPixelRatioLimit));
+  renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = PCFSoftShadowMap;
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.2;
+
+  const surfaceDetail = createSurfaceDetail(renderer);
+  surfaceDetail.applyScene(arrivalCutscene.scene);
+
+  const configureSceneShadows = (targetScene) => {
+    targetScene.traverse((object) => {
+      if (!object.isMesh) return;
+
+      const materials = Array.isArray(object.material)
+        ? object.material
+        : [object.material];
+      object.receiveShadow = true;
+      object.castShadow = !object.isInstancedMesh
+        && materials.length > 0
+        && materials.every((material) => !material.transparent && material.opacity === 1);
+    });
+  };
 
   const scene = new Scene();
   scene.background = new Color(0x17243a);
@@ -286,6 +308,16 @@ async function createGrassScene() {
 
   const moonlight = new DirectionalLight(0xb5c7ea, 0.62);
   moonlight.position.set(-30, 45, 20);
+  moonlight.castShadow = true;
+  moonlight.shadow.mapSize.set(2048, 2048);
+  moonlight.shadow.camera.left = -58;
+  moonlight.shadow.camera.right = 58;
+  moonlight.shadow.camera.top = 58;
+  moonlight.shadow.camera.bottom = -58;
+  moonlight.shadow.camera.near = 0.1;
+  moonlight.shadow.camera.far = 120;
+  moonlight.shadow.camera.updateProjectionMatrix();
+  moonlight.shadow.normalBias = 0.04;
   scene.add(moonlight);
 
   const starPositions = [];
@@ -341,6 +373,7 @@ async function createGrassScene() {
   );
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.06;
+  ground.receiveShadow = true;
   scene.add(ground);
 
   const lampModel = lampGltf.scene;
@@ -370,6 +403,11 @@ async function createGrassScene() {
   lampModel.position.set(-lampCenter.x, -lampBounds.min.y, -lampCenter.z);
   const lampRoot = new Group();
   lampRoot.add(lampModel);
+  lampRoot.traverse((object) => {
+    if (!object.isMesh) return;
+    object.castShadow = true;
+    object.receiveShadow = true;
+  });
   lampRoot.scale.setScalar(2.1);
   lampRoot.position.set(0, 0.76, -4.2);
   scene.add(lampRoot);
@@ -388,6 +426,11 @@ async function createGrassScene() {
       table.add(leg);
     }
   }
+  table.traverse((object) => {
+    if (!object.isMesh) return;
+    object.castShadow = true;
+    object.receiveShadow = true;
+  });
   scene.add(table);
 
   const bulbBounds = new Box3().setFromObject(lampBulb);
@@ -433,6 +476,16 @@ async function createGrassScene() {
 
     const roomLight = new DirectionalLight(0xffd7b0, 2.2);
     roomLight.position.set(-3, 7, 4);
+    roomLight.castShadow = true;
+    roomLight.shadow.mapSize.set(1024, 1024);
+    roomLight.shadow.camera.left = -12;
+    roomLight.shadow.camera.right = 12;
+    roomLight.shadow.camera.top = 12;
+    roomLight.shadow.camera.bottom = -12;
+    roomLight.shadow.camera.near = 0.1;
+    roomLight.shadow.camera.far = 40;
+    roomLight.shadow.normalBias = 0.035;
+    roomLight.shadow.camera.updateProjectionMatrix();
     roomScene.add(roomLight);
 
     const faceLight = new PointLight(0xffd9a3, 1.6, 10, 2);
@@ -464,6 +517,16 @@ async function createGrassScene() {
 
     const brokenRoofLight = new DirectionalLight(0xb7c3c0, 0.9);
     brokenRoofLight.position.set(-4, 8, 3);
+    brokenRoofLight.castShadow = true;
+    brokenRoofLight.shadow.mapSize.set(2048, 2048);
+    brokenRoofLight.shadow.camera.left = -34;
+    brokenRoofLight.shadow.camera.right = 34;
+    brokenRoofLight.shadow.camera.top = 28;
+    brokenRoofLight.shadow.camera.bottom = -28;
+    brokenRoofLight.shadow.camera.near = 0.1;
+    brokenRoofLight.shadow.camera.far = 100;
+    brokenRoofLight.shadow.normalBias = 0.04;
+    brokenRoofLight.shadow.camera.updateProjectionMatrix();
     destinationScene.add(brokenRoofLight);
 
     const moonbeam = new PointLight(0xc2cbd2, 1.6, 11, 2);
@@ -641,11 +704,30 @@ async function createGrassScene() {
             x: axis === 'x' ? alongWall : plane,
             y: row * 0.76 + sectionHeight / 2,
             z: axis === 'z' ? alongWall : plane,
-            width: sectionWidth * (0.94 + random() * 0.1),
-            height: sectionHeight * (0.94 + random() * 0.1)
+            width: sectionWidth * (1.02 + random() * 0.04),
+            height: sectionHeight * (1.02 + random() * 0.04)
           });
         }
       }
+
+      const mortarGeometry = axis === 'x'
+        ? new BoxGeometry(sectionWidth * 1.02, sectionHeight * 1.04, wallDepth * 0.72)
+        : new BoxGeometry(wallDepth * 0.72, sectionHeight * 1.04, sectionWidth * 1.02);
+      const mortarMaterial = new MeshStandardMaterial({
+        color: 0x77725f,
+        roughness: 1,
+        metalness: 0
+      });
+      const mortar = new InstancedMesh(mortarGeometry, mortarMaterial, placements.length);
+      mortar.name = 'brick wall mortar';
+      mortar.matrixAutoUpdate = false;
+      const mortarTransform = new Matrix4();
+      placements.forEach((brick, index) => {
+        mortarTransform.makeTranslation(brick.x, brick.y, brick.z);
+        mortar.setMatrixAt(index, mortarTransform);
+      });
+      mortar.instanceMatrix.needsUpdate = true;
+      destinationScene.add(mortar);
 
       const wall = new InstancedMesh(
         brickGeometry,
@@ -753,7 +835,11 @@ async function createGrassScene() {
     const woodMaterial = new MeshStandardMaterial({ color: 0x453629, roughness: 1 });
     const fadedFabric = new MeshStandardMaterial({ color: 0x666151, roughness: 1 });
     const furnishingBox = (name, size, position, material, rotationY = 0) => {
-      const furnishing = new Mesh(new BoxGeometry(...size), material);
+      const bevelRadius = Math.min(0.055, Math.min(...size.map(Math.abs)) * 0.12);
+      const furnishing = new Mesh(
+        new RoundedBoxGeometry(...size, 3, bevelRadius),
+        material
+      );
       furnishing.name = name;
       furnishing.position.set(...position);
       furnishing.rotation.y = rotationY;
@@ -1791,6 +1877,11 @@ async function createGrassScene() {
       return doorway !== undefined && !isClosedTechRoomDoor(wall.axis, wall.position, doorway);
     });
 
+    configureSceneShadows(roomScene);
+    configureSceneShadows(destinationScene);
+    surfaceDetail.applyScene(roomScene, { environmentLighting: true });
+    surfaceDetail.applyScene(destinationScene, { environmentLighting: true });
+
     return {
       scene: roomScene,
       minX: roomBounds.min.x + 0.25,
@@ -2012,6 +2103,8 @@ async function createGrassScene() {
   );
   camera.rotation.set(spawnPitch, spawnYaw, 0, 'YXZ');
 
+  surfaceDetail.applyScene(scene);
+
   return {
     renderer,
     scene,
@@ -2078,7 +2171,6 @@ function renderGrass(time) {
     grassStatus.textContent = result.caption;
     cutsceneFade.classList.toggle('is-visible', arrivalCutscene.isFading);
     if (result.active) {
-      grassScene.renderer.shadowMap.enabled = true;
       grassScene.renderer.render(arrivalCutscene.scene, arrivalCutscene.camera);
       grassAnimationFrame = requestAnimationFrame(renderGrass);
       return;
@@ -2086,7 +2178,6 @@ function renderGrass(time) {
 
     arrivalCutscene.dispose();
     grassScene.arrivalCutscene = null;
-    grassScene.renderer.shadowMap.enabled = false;
     resizeGrassScene();
     grassGame.classList.remove('is-cutscene');
     cutsceneFade.classList.remove('is-visible');
