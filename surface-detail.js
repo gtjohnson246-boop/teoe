@@ -62,12 +62,42 @@ function createMicroNormalMap() {
 export function createSurfaceDetail(renderer) {
   const normalMap = createMicroNormalMap();
   normalMap.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  const maxTextureSize = Math.min(2048, renderer.capabilities.maxTextureSize);
+  const resizedImages = new WeakMap();
 
   const environment = new RoomEnvironment();
   const pmremGenerator = new PMREMGenerator(renderer);
   const environmentMap = pmremGenerator.fromScene(environment).texture;
   environment.dispose();
   pmremGenerator.dispose();
+
+  const limitTextureSize = (texture) => {
+    if (texture.isDataTexture || texture.isCompressedTexture) return;
+
+    const image = texture.image;
+    if (!image) return;
+
+    const width = image.naturalWidth || image.width;
+    const height = image.naturalHeight || image.height;
+    if (!width || !height || Math.max(width, height) <= maxTextureSize) return;
+
+    let resizedImage = resizedImages.get(image);
+    if (!resizedImage) {
+      const scale = maxTextureSize / Math.max(width, height);
+      resizedImage = document.createElement('canvas');
+      resizedImage.width = Math.max(1, Math.floor(width * scale));
+      resizedImage.height = Math.max(1, Math.floor(height * scale));
+      const context = resizedImage.getContext('2d');
+      if (!context) {
+        throw new Error('Could not create a canvas to resize a scene texture.');
+      }
+      context.drawImage(image, 0, 0, resizedImage.width, resizedImage.height);
+      resizedImages.set(image, resizedImage);
+    }
+
+    texture.image = resizedImage;
+    texture.needsUpdate = true;
+  };
 
   const applyScene = (scene, { environmentLighting = false } = {}) => {
     scene.traverse((object) => {
@@ -79,6 +109,7 @@ export function createSurfaceDetail(renderer) {
       materials.forEach((material) => {
         Object.values(material).forEach((value) => {
           if (value?.isTexture) {
+            limitTextureSize(value);
             value.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
           }
         });
