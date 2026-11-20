@@ -4,10 +4,12 @@ const playButton = document.getElementById('play-button');
 const gameScreen = document.getElementById('game-screen');
 const gameCanvas = document.getElementById('game-canvas');
 const bloodOverlay = document.getElementById('blood-overlay');
+const maskOverlay = document.getElementById('mask-overlay');
 const visionBlink = document.getElementById('vision-blink');
 const animatronicDeath = document.getElementById('animatronic-death');
 const gameStatus = document.getElementById('game-status');
 const gameControls = document.getElementById('game-controls');
+const maskToggleButton = document.getElementById('mask-toggle');
 const backButton = document.getElementById('back-button');
 const deathRestartButton = document.getElementById('death-restart');
 const graphicsResetMessage = 'Graphics paused after a device reset. Waiting for recovery...';
@@ -40,10 +42,18 @@ let cameraPitch = 0;
 let lookPointerId = null;
 let lastLookX = 0;
 let lastLookY = 0;
+let maskWorn = false;
 let voiceAudioContext = null;
 let voiceAnalyser = null;
 let voiceSource = null;
 let voiceWaveform = null;
+
+function setMaskWorn(worn) {
+  maskWorn = worn;
+  maskOverlay.classList.toggle('is-worn', maskWorn);
+  maskToggleButton.setAttribute('aria-pressed', String(maskWorn));
+  maskToggleButton.textContent = maskWorn ? 'Remove mask (M)' : 'Wear mask (M)';
+}
 
 function unlockCharacterVoice() {
   if (!window.AudioContext) return;
@@ -1057,6 +1067,7 @@ async function createGameScene() {
     const techRoomDoors = [];
     let interiorWalls = [];
     const beginEncounter = () => {
+      setMaskWorn(false);
       stopCharacterVoice();
       resetGrabSound();
       resetBleedingEffect();
@@ -1088,6 +1099,8 @@ async function createGameScene() {
     };
 
     const killPlayerWithAnimatronic = (time, threatRoot) => {
+      if (maskWorn || animatronicDead) return;
+
       animatronicDead = true;
       animatronicDeathStartedAt = time;
       deathThreatRoot = threatRoot;
@@ -1364,6 +1377,7 @@ async function createGameScene() {
     };
 
     const respawnFromAnimatronic = () => {
+      setMaskWorn(false);
       animatronicDeath.hidden = true;
       resetBleedingEffect();
       animatronicDeathStartedAt = null;
@@ -1379,7 +1393,7 @@ async function createGameScene() {
       cameraYaw = Math.PI;
       cameraPitch = 0;
       gameStatus.textContent = '';
-      gameControls.textContent = "WASD / arrows · drag to look · E opens/closes doors · avoid both creatures";
+      gameControls.textContent = "WASD / arrows · drag to look · E doors · M mask";
     };
 
     const updateEncounter = (time) => {
@@ -1396,7 +1410,7 @@ async function createGameScene() {
         if (transportElapsed >= 2.6) {
           visionBlink.classList.remove('is-blinking');
           gameStatus.textContent = 'You wake up in the tech room.';
-          gameControls.textContent = "WASD / arrows · drag to look · E opens/closes doors · avoid both creatures";
+          gameControls.textContent = "WASD / arrows · drag to look · E doors · M mask";
         }
         return 0;
       }
@@ -1800,7 +1814,7 @@ playButton.addEventListener('click', async () => {
     if (gameScene.livingRoom) {
       setSeatedLivingRoomView();
       gameScene.livingRoom.beginEncounter();
-      gameControls.textContent = 'Drag to look around the living room from the couch';
+      gameControls.textContent = 'Drag to look around · M wears the mask';
     }
     if (gameScene.livingRoom) {
       startGameScene();
@@ -1817,7 +1831,7 @@ playButton.addEventListener('click', async () => {
     gameScene.livingRoom = await gameScene.loadLivingRoom();
     setSeatedLivingRoomView();
     gameScene.livingRoom.beginEncounter();
-    gameControls.textContent = 'Drag to look around the living room from the couch';
+    gameControls.textContent = 'Drag to look around · M wears the mask';
     gameStatus.textContent = '';
     startGameScene();
   } catch (error) {
@@ -1846,7 +1860,12 @@ deathRestartButton.addEventListener('click', () => {
   gameScene?.livingRoom?.respawnFromAnimatronic();
 });
 
+maskToggleButton.addEventListener('click', () => {
+  setMaskWorn(!maskWorn);
+});
+
 backButton.addEventListener('click', () => {
+  setMaskWorn(false);
   gameScreen.hidden = true;
   menu.hidden = false;
   stopCharacterVoice();
@@ -1896,6 +1915,13 @@ gameCanvas.addEventListener('pointercancel', stopLooking);
 
 window.addEventListener('keydown', (event) => {
   if (gameScreen.hidden) return;
+  if (event.code === 'KeyM') {
+    if (!event.repeat) {
+      event.preventDefault();
+      setMaskWorn(!maskWorn);
+    }
+    return;
+  }
   if (event.code === 'KeyE') {
     if (!event.repeat && gameScene?.livingRoom?.isDestinationActive) {
       event.preventDefault();

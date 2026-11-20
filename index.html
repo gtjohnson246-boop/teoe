@@ -50,6 +50,7 @@
       <section id="game-screen" class="game-screen" aria-label="Living room game" hidden>
         <canvas id="game-canvas" class="game-canvas" aria-label="Three-dimensional game scene"></canvas>
         <div id="blood-overlay" class="blood-overlay" aria-hidden="true"></div>
+        <div id="mask-overlay" class="mask-overlay" aria-hidden="true"></div>
         <div id="vision-blink" class="vision-blink" aria-hidden="true"></div>
         <section id="animatronic-death" class="animatronic-death" role="dialog" aria-modal="true" aria-labelledby="death-title" hidden>
           <div class="death-card">
@@ -61,7 +62,8 @@
         </section>
         <p id="game-status" class="game-status" role="status" aria-live="polite"></p>
         <span class="game-reticle" aria-hidden="true"></span>
-        <p id="game-controls" class="game-controls">Drag to look around the living room from the couch</p>
+        <p id="game-controls" class="game-controls">Drag to look around the living room from the couch · M wears the mask</p>
+        <button id="mask-toggle" class="mask-toggle" type="button" aria-pressed="false">Wear mask (M)</button>
         <button id="back-button" class="back-button" type="button">Back to menu</button>
       </section>
     </main>
